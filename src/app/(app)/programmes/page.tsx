@@ -1,55 +1,103 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
-import { PlaceholderNotice } from "@/components/shared/placeholder-notice";
+import { ProgressMeter } from "@/components/shared/progress-meter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRunnerContext } from "@/features/dashboard/context";
+import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
+import { listProgrammes, type ProgrammeCategory, type ProgrammeListItem } from "@/features/workouts/programme-queries";
 
 export const metadata: Metadata = { title: "Programmes" };
 
-/** Programme outlines (product content, not runner data). Final content comes from the database. */
-const PROGRAMMES = [
+const SECTIONS: { category: ProgrammeCategory; title: string; description: string }[] = [
+  { category: "couch_to_5k", title: "Couch to 5K", description: "From walking to running 5 km in nine weeks." },
   {
-    title: "Couch to 5K",
-    level: "Beginner",
-    outline: "9 weeks · 3 sessions a week · 20–30 minutes",
-    body: "Alternate walking and running, building gradually until you can run 5 km or 30 minutes without stopping.",
+    category: "general_fitness",
+    title: "General fitness",
+    description: "Yoga, upper body, mobility, strength and recovery.",
   },
   {
-    title: "Strength and conditioning",
-    level: "Intermediate",
-    outline: "Programme length to be confirmed by coaches",
-    body: "Bodyweight strength, mobility and conditioning to support running and reduce injury risk.",
+    category: "training_and_shine",
+    title: "Training and Shine",
+    description: "Coach-led, longer-term training for people who are already active.",
   },
 ];
 
-export default function ProgrammesPage() {
+const LEVEL = { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" } as const;
+
+function StatusBadge({ item }: { item: ProgrammeListItem }) {
+  const s = item.enrollment?.status;
+  if (!s || s === "withdrawn") return null;
+  const label = { requested: "Requested", active: "Enrolled", paused: "Paused", completed: "Completed" }[s];
+  return <Badge variant={s === "active" ? "default" : "secondary"}>{label}</Badge>;
+}
+
+export default async function ProgrammesPage() {
+  const ctx = await getRunnerContext();
+  const header = <PageHeader title="Programmes" description="Structured plans that progress at a pace you can keep." />;
+  if (!ctx)
+    return (
+      <>
+        {header}
+        <RunnerPreviewNotice feature="training programmes" />
+      </>
+    );
+  const items = await listProgrammes(ctx);
+
   return (
     <>
-      <PageHeader title="Programmes" description="Structured plans that progress at a pace beginners can keep." />
-      <div className="space-y-6">
-        <PlaceholderNotice feature="training programmes" owner="Training">
-          Programme outlines are draft content; enrolment is not available yet.
-        </PlaceholderNotice>
-        <div className="grid gap-4 md:grid-cols-2">
-          {PROGRAMMES.map((p) => (
-            <Card key={p.title}>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle>{p.title}</CardTitle>
-                  <Badge variant="secondary">{p.level}</Badge>
-                </div>
-                <CardDescription>{p.outline}</CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">{p.body}</CardContent>
-              <CardFooter>
-                <Button variant="outline" disabled>
-                  Enrolment coming soon
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+      {header}
+      <div className="space-y-10">
+        {SECTIONS.map((section) => {
+          const list = items.filter((i) => i.programme.category === section.category);
+          if (!list.length) return null;
+          return (
+            <section key={section.category} aria-labelledby={`h-${section.category}`} className="space-y-4">
+              <div>
+                <h2 id={`h-${section.category}`} className="text-lg font-semibold text-brand-navy">
+                  {section.title}
+                </h2>
+                <p className="text-sm text-muted-foreground">{section.description}</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {list.map((item) => (
+                  <Card key={item.programme.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle>{item.programme.title}</CardTitle>
+                        <StatusBadge item={item} />
+                      </div>
+                      <CardDescription>
+                        {LEVEL[item.programme.level]} · {item.programme.durationWeeks} weeks ·{" "}
+                        {item.programme.sessionsPerWeek} sessions a week
+                        {item.programme.enrolment === "coach_approval" && " · coach approval"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 text-sm text-muted-foreground">
+                      <p>{item.programme.summary}</p>
+                      {item.progress && item.enrollment?.status !== "withdrawn" && (
+                        <ProgressMeter
+                          label="Sessions completed"
+                          value={item.progress.completed}
+                          max={item.progress.total}
+                        />
+                      )}
+                    </CardContent>
+                    <CardFooter>
+                      <Button asChild variant={item.enrollment?.status === "active" ? "default" : "outline"}>
+                        <Link href={`/programmes/${item.programme.slug}`}>
+                          {item.enrollment?.status === "active" ? "Continue" : "View programme"}
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </>
   );
