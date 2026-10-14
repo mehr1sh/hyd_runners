@@ -1,5 +1,9 @@
 # HYD Runners
 
+> **Course project:** `dsi-monsoon-2026-06b`
+>
+> **Problem statement:** Adapting support to individuals: How might we determine what kind of intervention or support may be appropriate for different behavioural patterns, rather than providing the same intervention to everyone?
+
 A beginner-friendly running, fitness and community platform for Hyderabad. It helps new runners build a **consistent habit** with plans that fit around **changing timetables**.
 
 This repository holds the shared application foundation: routes, layout, design system, contracts, auth and database foundation. Feature work happens on the three feature branches described in [CONTRIBUTING.md](CONTRIBUTING.md).
