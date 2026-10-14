@@ -1,3 +1,3 @@
-# Reports — owner: Training (Developer B)
+# Reports — runner experience (`feat/runner-experience`)
 
-Scope: weekly, monthly and yearly reports (`ActivityReport`), backed by SQL views or `pg_cron` snapshots. Use `components/charts/weekly-minutes-chart.tsx` or add charts here.
+Personal weekly, monthly and yearly reports from persisted workouts (`logic/aggregate.ts`, pure and tested), loaded by `queries.ts` and drawn with Recharts in `components/report-charts.tsx`.

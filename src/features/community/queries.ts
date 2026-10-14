@@ -44,3 +44,21 @@ export async function listLocations(): Promise<Location[]> {
     Location.parse({ ...row, latitude: Number(row.latitude), longitude: Number(row.longitude) }),
   );
 }
+
+/** Going counts for published events (no attendee identities exposed). */
+export async function getAttendance(eventIds: string[]): Promise<Map<string, number>> {
+  if (!isSupabaseConfigured || eventIds.length === 0) return new Map();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("event_attendance", { p_event_ids: eventIds });
+  if (error) throw new Error(`Could not load attendance: ${error.message}`);
+  return new Map((data ?? []).map((r: { event_id: string; going: number }) => [r.event_id, Number(r.going)]));
+}
+
+/** The caller's own RSVP status per event. */
+export async function getMyRsvps(userId: string): Promise<Map<string, "going" | "cancelled">> {
+  if (!isSupabaseConfigured) return new Map();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("event_rsvps").select("event_id, status").eq("user_id", userId);
+  if (error) throw new Error(`Could not load RSVPs: ${error.message}`);
+  return new Map((data ?? []).map((r) => [r.event_id as string, r.status as "going" | "cancelled"]));
+}
