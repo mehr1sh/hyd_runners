@@ -1,5 +1,3 @@
-# Gamification — owner: Training (Developer B)
+# Gamification — runner experience (`feat/runner-experience`)
 
-Scope: XP and coins ledger (`XpTransaction`), streaks, badges, character evolution, leaderboards, `AchievementSummary`.
-
-Rule: XP, coins, badges and streaks are written only server-side (Postgres triggers or security-definer functions). Clients never insert into these tables.
+XP, coins, levels and ranks, habit and weekly streaks, badges, weekly challenges and character stages. All rules live in `logic/` as pure functions (`computeRewards` is the single source of truth). `service.ts` reconciles them into the database with deterministic award keys, so rewards can never be paid twice. Rules are documented in `docs/RUNNER_EXPERIENCE.md`; badge codes must match the `badges` rows in the migration.
