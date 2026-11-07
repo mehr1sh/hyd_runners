@@ -15,6 +15,12 @@ const ServerEnv = z.object({
   AI_DAILY_CALL_LIMIT: z.coerce.number().int().min(0).default(10),
 });
 
+/**
+ * True on Vercel Preview deployments. Preview shares the production Supabase
+ * project, so features that create accounts or need the secret key are off.
+ */
+export const isPreviewDeployment = process.env.VERCEL_ENV === "preview";
+
 export const serverEnv = ServerEnv.parse({
   SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY || undefined,
   AI_PROVIDER: process.env.AI_PROVIDER || undefined,

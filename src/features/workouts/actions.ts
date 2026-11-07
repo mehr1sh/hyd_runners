@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { PrivilegedAccessUnavailableError } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { WorkoutType } from "@/lib/contracts";
 import {
@@ -31,6 +32,8 @@ async function requireUserId() {
 
 function errorState(e: unknown): ActionState {
   if (e instanceof WorkoutError) return { status: "error", message: e.message };
+  if (e instanceof PrivilegedAccessUnavailableError)
+    return { status: "error", message: "Saving workouts is not available on this deployment." };
   console.error(e);
   return { status: "error", message: "Something went wrong. Please try again." };
 }

@@ -1,15 +1,18 @@
 import { fail, ok } from "@/lib/api/response";
 import { isSupabaseConfigured } from "@/lib/env";
+import { isPreviewDeployment } from "@/lib/env.server";
 import { seedDemoData } from "@/features/dashboard/demo-seed";
 
 /**
  * POST /api/v1/dev/seed-demo — create or reset the labelled demo accounts.
  * Always allowed in development. In production it requires
  * `Authorization: Bearer <DEMO_SEED_TOKEN>` and is disabled when that
- * variable is unset.
+ * variable is unset. Never available on Vercel Preview deployments, which
+ * share the production database.
  */
 export async function POST(request: Request) {
   if (!isSupabaseConfigured) return fail("internal_error", "Supabase is not configured.");
+  if (isPreviewDeployment) return fail("not_found", "Not found.");
   if (process.env.NODE_ENV === "production") {
     const token = process.env.DEMO_SEED_TOKEN;
     if (!token) return fail("not_found", "Not found.");

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
+import { isPreviewDeployment } from "@/lib/env.server";
 import { createClient } from "@/lib/supabase/server";
 import { authErrorMessage, safeNextPath } from "./logic/auth";
 import { isValidTimeZone, parseExperienceForm, parsePlacesForm, parseTrainingForm } from "./logic/onboarding";
@@ -53,6 +54,9 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
 
 export async function signUp(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   if (!isSupabaseConfigured) return { status: "error", message: "Sign-up is unavailable in preview mode." };
+  // Preview shares the production database: sign in with a test account instead.
+  if (isPreviewDeployment)
+    return { status: "error", message: "Sign-up is turned off on preview deployments. Sign in with a test account." };
 
   const parsed = SignUpForm.safeParse({
     email: formData.get("email"),
