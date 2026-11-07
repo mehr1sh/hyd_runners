@@ -15,6 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Migration versions are unique
+        # Supabase tracks applied migrations by version only; a reused
+        # version is silently skipped on databases that already have it.
+        run: |
+          dupes=$(find supabase/migrations -name '*.sql' -printf '%f\n' | cut -d_ -f1 | sort | uniq -d)
+          if [ -n "$dupes" ]; then echo "::error::Duplicate migration versions: $dupes"; exit 1; fi
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
