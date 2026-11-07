@@ -1,4 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
+import { usesLocalDatabase, WRITES_DATA } from "./support/database";
+
+// Writes accounts and data: never against the shared Production/Preview database.
+test.skip(!usesLocalDatabase(), WRITES_DATA);
 
 /**
  * Schedule planner end to end. Runs only when Supabase is configured; AI is

@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Page } from "@playwright/test";
+import { adminClient, PASSWORD, testEmail, usesLocalDatabase, WRITES_DATA } from "./support/database";
 
 /**
  * Sign-in lands on a dashboard that renders on the server and hydrates
@@ -9,26 +8,8 @@ import { expect, test, type Page } from "@playwright/test";
  * without a profile/role row. Needs local Supabase and SUPABASE_SECRET_KEY.
  */
 
-const PASSWORD = "correct-horse-battery";
-
-function localEnv(name: string) {
-  if (process.env[name]) return process.env[name];
-  try {
-    const line = readFileSync(".env.local", "utf8")
-      .split("\n")
-      .find((entry) => entry.startsWith(`${name}=`));
-    return line?.slice(name.length + 1).trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function adminClient() {
-  const url = localEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const key = localEnv("SUPABASE_SECRET_KEY");
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-}
+// Writes accounts and data: never against the shared Production/Preview database.
+test.skip(!usesLocalDatabase(), WRITES_DATA);
 
 function watchConsole(page: Page) {
   const errors: string[] = [];
@@ -66,7 +47,7 @@ test.describe("dashboard after sign-in", () => {
 
   test("a runner with a complete profile sees their dashboard", async ({ page }, testInfo) => {
     const admin = adminClient()!;
-    const email = `dash-full-${testInfo.project.name}-${Date.now()}@example.test`;
+    const email = testEmail("dash-full", testInfo.project.name);
     const { error } = await admin.auth.admin.createUser({
       email,
       password: PASSWORD,
@@ -84,7 +65,7 @@ test.describe("dashboard after sign-in", () => {
 
   test("a runner without a profile or role row still gets a working dashboard", async ({ page }, testInfo) => {
     const admin = adminClient()!;
-    const email = `dash-noprofile-${testInfo.project.name}-${Date.now()}@example.test`;
+    const email = testEmail("dash-noprofile", testInfo.project.name);
     const { data, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
     expect(error).toBeNull();
     const userId = data.user!.id;

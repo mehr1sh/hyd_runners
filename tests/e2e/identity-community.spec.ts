@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { expect, test, type Page } from "@playwright/test";
+import { adminClient, PASSWORD, usesLocalDatabase, WRITES_DATA } from "./support/database";
 
 /**
  * Onboarding, profile and the community feedback loop across runner, coach and
@@ -8,26 +8,8 @@ import { expect, test, type Page } from "@playwright/test";
  * created with the local secret key because roles cannot be self-granted.
  */
 
-const PASSWORD = "correct-horse-battery";
-
-function localEnv(name: string) {
-  if (process.env[name]) return process.env[name];
-  try {
-    const line = readFileSync(".env.local", "utf8")
-      .split("\n")
-      .find((entry) => entry.startsWith(`${name}=`));
-    return line?.slice(name.length + 1).trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function adminClient() {
-  const url = localEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const key = localEnv("SUPABASE_SECRET_KEY");
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-}
+// Writes accounts and data: never against the shared Production/Preview database.
+test.skip(!usesLocalDatabase(), WRITES_DATA);
 
 async function createUser(admin: SupabaseClient, email: string, displayName: string, roles: string[] = []) {
   const { data, error } = await admin.auth.admin.createUser({

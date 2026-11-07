@@ -6,6 +6,8 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { isLocalSupabaseUrl } from "../local-supabase";
+
 vi.mock("server-only", () => ({}));
 
 function loadEnv() {
@@ -17,7 +19,7 @@ function loadEnv() {
   } catch {
     /* no local env */
   }
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+  return isLocalSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.SUPABASE_SECRET_KEY);
 }
 
 const enabled = loadEnv();

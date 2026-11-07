@@ -13,13 +13,15 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { isLocalSupabaseUrl } from "../local-supabase";
 import { buildPdf } from "./pdf-fixture";
 
 vi.mock("server-only", () => ({}));
 
 const enabled =
   process.env.SCHEDULER_INTEGRATION === "1" &&
-  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+  isLocalSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+  Boolean(process.env.SUPABASE_SECRET_KEY);
 
 const URL_BASE = "http://localhost/api/v1";
 const PASSWORD = "integration-password-123";
