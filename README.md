@@ -39,7 +39,7 @@ tests/
   e2e/            Playwright (desktop + mobile)
 .github/workflows/
   ci.yml          lint, typecheck, unit, RLS, build and e2e on every PR
-  db-deploy.yml   manual migration deploys to staging or production
+  db-deploy.yml   manual, approved migration deploys to the hosted project
 ```
 
 Every table has RLS and the browser only holds the publishable key. The secret key, AI keys and privileged writes stay on the server (`server-only` imports enforce this).
@@ -104,6 +104,12 @@ AI_PROVIDER=none pnpm test:e2e
 
 `pnpm test:e2e` reuses any server already on port 3000; stop old `dev`/`start` servers first or use `PORT=3200 pnpm test:e2e`. The opt-in scheduler API integration tests run with `SCHEDULER_INTEGRATION=1` and the `.env.local` values exported.
 
+Tests that create accounts or write data run only when `NEXT_PUBLIC_SUPABASE_URL` points at the local stack (`127.0.0.1`/`localhost`); they skip themselves against any hosted project. To check a deployment without writing anything, run the read-only spec as the dedicated test account:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://<deployment> E2E_RUNNER_EMAIL=… E2E_RUNNER_PASSWORD=… pnpm exec playwright test test-account smoke app-shells
+```
+
 ## Supabase migrations
 
 - Every schema change is a new file in `supabase/migrations/`, created with `pnpm db:new <name>`. Files run in order of their timestamp prefix.
@@ -114,36 +120,32 @@ AI_PROVIDER=none pnpm test:e2e
 
 ## Deployment
 
-**Environments**
+Vercel Production (branch `main`) and Preview (every other branch and PR) use the **same Supabase project**. Previews therefore act on real data, so they get only the publishable key:
 
-| Environment | Vercel                                   | Supabase project |
-| ----------- | ---------------------------------------- | ---------------- |
-| Production  | Production branch `main`                 | production       |
-| Preview     | Every other branch and PR gets a preview | staging          |
+| Variable                                                           | Production | Preview  |
+| ------------------------------------------------------------------ | ---------- | -------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes        | yes      |
+| `NEXT_PUBLIC_SITE_URL` = `https://hydrunners.vercel.app`           | yes        | yes      |
+| `SUPABASE_SECRET_KEY`, `DEMO_SEED_TOKEN`                           | yes        | **no**   |
+| AI and map variables                                               | yes        | optional |
 
-Previews must never use production credentials: scope the production Supabase variables to **Production** only, and give **Preview** the staging project's values (and its own `NEXT_PUBLIC_SITE_URL` or none).
+On a Preview deployment, RLS applies to everything, sign-up is turned off, the demo seed is disabled and saving workouts (which needs the secret key) shows "not available on this deployment". Sign in with a dedicated test account that has only the `runner` role; never give test accounts staff roles, since staff actions such as announcements and events are visible in production. Previews never run migrations, and a branch that adds a migration previews against the current schema.
 
-**Supabase (per project, in the Mumbai region)**
+**Supabase (Mumbai region)**
 
-1. Copy the publishable (`sb_publishable_…`) and secret (`sb_secret_…`) keys from Settings → API Keys.
-2. Authentication → URL Configuration: Site URL `https://hydrunners.vercel.app` (production), and redirect URLs `<site>/auth/callback` plus `https://*-<vercel-team>.vercel.app/auth/callback` for previews on staging.
-3. Keep "Confirm email" on.
+1. Settings → API Keys: the publishable (`sb_publishable_…`) and secret (`sb_secret_…`) keys. The secret key goes only in server-side variables; the build refuses a secret key in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+2. Authentication → URL Configuration: Site URL `https://hydrunners.vercel.app`, redirect URL `https://hydrunners.vercel.app/auth/callback`. Keep "Confirm email" on.
 
-**Vercel**
-
-1. Import the repository (Next.js and pnpm are detected), function region `bom1`.
-2. Add the environment variables above with the scopes described.
+**Vercel:** import the repository (Next.js and pnpm are detected), set the function region to `bom1`, and add the variables with the scopes above.
 
 **Migrations (GitHub Actions)**
 
-Create two GitHub environments, `staging` and `production`, each with the variable `SUPABASE_PROJECT_ID` and the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. Give `production` required reviewers.
-
-Run **Actions → Deploy database migrations → Run workflow** and choose the target. The workflow prints a dry run, then applies pending migrations. Production runs only from `main`, only after CI has passed for that commit, and only when the confirm field says `migrate production`. Merging never migrates a database on its own.
+The GitHub environment `production` holds the variable `SUPABASE_PROJECT_ID` and the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, and requires a reviewer's approval. Run **Actions → Deploy database migrations → Run workflow** from `main` and type `migrate production`. The job waits for approval, checks that CI passed for that commit, prints a dry run and applies pending migrations. Nothing else migrates the hosted database: not merges, not Vercel builds, not tests. CI also fails if two migrations share a version.
 
 **Release order**
 
 1. Merge to `main` after CI passes; Vercel deploys production.
-2. Run the migration workflow for `production` and check the dry run lists only the expected migrations.
+2. Run the migration workflow and check the dry run lists only the expected migrations.
 3. Check `https://hydrunners.vercel.app/api/v1/health` reports `"supabaseConfigured":true`, then sign in and open the dashboard. Until migrations are applied the dashboard shows a "not available yet" notice instead of data.
 
 Free Supabase projects pause after a week without activity; open the site the day before a demo.
