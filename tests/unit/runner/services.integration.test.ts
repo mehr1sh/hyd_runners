@@ -115,6 +115,64 @@ describe.skipIf(!enabled)("workout and reward services (local Supabase)", async 
     expect((await ledgerTotal()).xp).toBe(first.xp);
   });
 
+  it("lets a runner create their own workout but never change another runner's", async () => {
+    const { abandonWorkout } = await import("@/features/workouts/service");
+    const { createClient } = await import("@supabase/supabase-js");
+    const email = `itest-other-${Date.now()}@example.test`;
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email,
+      password: "correct-horse-battery",
+      email_confirm: true,
+    });
+    if (error) throw error;
+    const otherId = created.user.id;
+    try {
+      // The runner creates their own workout through the server.
+      const { workoutId } = await startWorkout(userId, { kind: "free", workoutType: "walk", title: "Mine" }, admin);
+      const input = { durationMinutes: 20, distanceKm: null, perceivedEffort: null, notes: null, locationId: null };
+
+      // Another runner cannot complete it, discard it, or use the runner's enrolment.
+      await expect(completeWorkout(otherId, workoutId, input, admin)).rejects.toMatchObject({ code: "not_found" });
+      await abandonWorkout(otherId, workoutId, admin);
+      const { data: row } = await admin.from("workout_logs").select("user_id, status").eq("id", workoutId).single();
+      expect(row).toEqual({ user_id: userId, status: "in_progress" });
+      await expect(
+        startWorkout(otherId, { kind: "programme", enrollmentId, sessionId: sessions[1].id }, admin),
+      ).rejects.toMatchObject({ code: "not_found" });
+
+      // With their own session and the publishable key, a runner cannot write workouts
+      // directly through the API: not their own, and not anyone else's.
+      const asOther = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false } },
+      );
+      expect((await asOther.auth.signInWithPassword({ email, password: "correct-horse-battery" })).error).toBeNull();
+      const insertOwn = await asOther.from("workout_logs").insert({
+        user_id: otherId,
+        status: "completed",
+        title: "Forged",
+        workout_type: "run",
+        started_at: new Date(Date.now() - 3_600_000).toISOString(),
+        completed_at: new Date().toISOString(),
+        duration_seconds: 3600,
+        idempotency_key: crypto.randomUUID(),
+      });
+      expect(insertOwn.error?.code).toBe("42501");
+      const editTheirs = await asOther.from("workout_logs").update({ title: "Taken" }).eq("id", workoutId);
+      expect(editTheirs.error?.code).toBe("42501");
+      const { data: visible } = await asOther.from("workout_logs").select("id").eq("id", workoutId);
+      expect(visible).toEqual([]);
+
+      // The owner can still finish it normally.
+      await abandonWorkout(userId, workoutId, admin);
+      const { data: after } = await admin.from("workout_logs").select("status").eq("id", workoutId).single();
+      expect(after?.status).toBe("abandoned");
+    } finally {
+      await admin.auth.admin.deleteUser(otherId);
+    }
+  });
+
   it("refuses to complete the same programme session twice", async () => {
     await expect(
       startWorkout(userId, { kind: "programme", enrollmentId, sessionId: sessions[0].id }, admin),

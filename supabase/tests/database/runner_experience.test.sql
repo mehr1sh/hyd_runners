@@ -1,7 +1,7 @@
 -- pgTAP: runner experience tables (programmes, workouts, rewards, RSVPs, leaderboard).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(21);
 
 -- Users: A (runner), B (runner, hidden from leaderboard), C (runner)
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
@@ -14,7 +14,8 @@ select is((select count(*)::int from public.programme_sessions s join public.pro
 
 -- Server-side (postgres) writes: workouts and ledger for A and B this week, C last week.
 insert into public.workout_logs (id, user_id, status, title, workout_type, started_at, completed_at, duration_seconds, idempotency_key)
-values ('bbbbbbbb-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001', 'completed', 'Run', 'run', now() - interval '1 hour', now() - interval '30 minutes', 1800, gen_random_uuid());
+values ('bbbbbbbb-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001', 'completed', 'Run', 'run', now() - interval '1 hour', now() - interval '30 minutes', 1800, gen_random_uuid()),
+       ('bbbbbbbb-0000-4000-8000-000000000002', 'aaaaaaaa-0000-4000-8000-000000000002', 'completed', 'Run', 'run', now() - interval '2 hours', now() - interval '90 minutes', 1800, gen_random_uuid());
 insert into public.xp_ledger (user_id, delta_xp, delta_coins, reason, award_key, occurred_at) values
   ('aaaaaaaa-0000-4000-8000-000000000001', 26, 5, 'workout_completed', 'workout:day:x', now()),
   ('aaaaaaaa-0000-4000-8000-000000000002', 40, 5, 'workout_completed', 'workout:day:x', now()),
@@ -35,6 +36,22 @@ select throws_ok(
   $$ insert into public.workout_logs (user_id, title, workout_type, started_at, idempotency_key)
      values ('aaaaaaaa-0000-4000-8000-000000000001', 'x', 'run', now(), gen_random_uuid()) $$,
   '42501', null, 'runners cannot write workout logs directly');
+-- Workouts are reward inputs: no direct edits or deletes, own or anyone else's.
+select is((select array_agg(id)::text from public.workout_logs), '{bbbbbbbb-0000-4000-8000-000000000001}',
+  'runner reads only their own workouts');
+select throws_ok(
+  $$ update public.workout_logs set duration_seconds = 21600 where id = 'bbbbbbbb-0000-4000-8000-000000000001' $$,
+  '42501', null, 'runners cannot edit their own workout directly');
+select throws_ok(
+  $$ update public.workout_logs set title = 'mine now' where id = 'bbbbbbbb-0000-4000-8000-000000000002' $$,
+  '42501', null, 'runners cannot edit another runner''s workout');
+select throws_ok(
+  $$ delete from public.workout_logs where id = 'bbbbbbbb-0000-4000-8000-000000000002' $$,
+  '42501', null, 'runners cannot delete another runner''s workout');
+select throws_ok(
+  $$ insert into public.workout_logs (user_id, status, title, workout_type, started_at, completed_at, duration_seconds, idempotency_key)
+     values ('aaaaaaaa-0000-4000-8000-000000000002', 'completed', 'x', 'run', now() - interval '1 hour', now(), 3600, gen_random_uuid()) $$,
+  '42501', null, 'runners cannot create workouts for another runner');
 select throws_ok(
   $$ insert into public.xp_ledger (user_id, delta_xp, reason, award_key, occurred_at)
      values ('aaaaaaaa-0000-4000-8000-000000000001', 1000, 'admin_adjustment', 'cheat', now()) $$,

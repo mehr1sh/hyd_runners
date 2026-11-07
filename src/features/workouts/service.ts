@@ -10,7 +10,12 @@ import { checkPlausibility, type CompletionInput, type ManualWorkoutInput } from
 /**
  * Workout persistence. Runners can only read workout_logs; every write goes
  * through these functions with the secret key after the caller's identity
- * has been verified by the server action. All operations are idempotent:
+ * has been verified by the server action. Runner sessions deliberately have
+ * no write access: the session and publishable key also live in the browser,
+ * so any write RLS allowed could be made directly against the API, skipping
+ * the plausibility, ownership and state checks below. Workouts are reward
+ * inputs (XP, badges, leaderboard), so those checks must not be bypassable.
+ * All operations are idempotent:
  *  - start returns the existing in-progress workout instead of a second one;
  *  - complete only transitions rows that are still in progress;
  *  - manual entries are keyed by a client-generated idempotency key;
