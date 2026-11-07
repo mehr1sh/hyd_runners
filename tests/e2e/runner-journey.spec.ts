@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { middayTimezone } from "./support/clock";
 import { usesLocalDatabase, WRITES_DATA } from "./support/database";
 
 // Writes accounts and data: never against the shared Production/Preview database.
@@ -23,6 +24,14 @@ test("a new runner completes a Couch to 5K session and earns rewards exactly onc
   await page.getByLabel("Password").fill("correct-horse-battery");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
+
+  // "Done for today" and "1/3 days" depend on the runner's local day; pin it
+  // away from midnight so the result does not depend on when CI runs.
+  await page.getByLabel("New to running").check();
+  await page.getByLabel("I struggle to stay consistent").check();
+  await page.getByLabel("Timezone").fill(middayTimezone());
+  await page.getByRole("button", { name: "Save and continue" }).click();
+  await expect(page.getByLabel("Fitness goal")).toBeVisible();
 
   // Empty states come from real (empty) data.
   await page.goto("/dashboard");
