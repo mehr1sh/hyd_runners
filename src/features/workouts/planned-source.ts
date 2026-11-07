@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PlannedWorkout } from "@/lib/contracts";
+import { isMissingSchemaError } from "@/lib/supabase/errors";
 
 /**
  * Integration point with the schedule planner (owned by the scheduler
@@ -11,8 +12,6 @@ import { PlannedWorkout } from "@/lib/contracts";
  * or edits schedules; a planned workout counts as completed when a
  * completed workout_logs row references it.
  */
-const MISSING_TABLE = new Set(["42P01", "PGRST205", "PGRST204", "PGRST200"]);
-
 type Row = {
   id: string;
   user_id: string;
@@ -62,7 +61,7 @@ export async function listPlannedWorkouts(
     .lt("starts_at", range.to.toISOString())
     .order("starts_at");
   if (error) {
-    if (MISSING_TABLE.has(error.code)) return [];
+    if (isMissingSchemaError(error)) return [];
     throw new Error(`Could not load planned workouts: ${error.message}`);
   }
   return toContract(data as Row[]);
@@ -76,7 +75,7 @@ export async function getPlannedWorkouts(
   if (ids.length === 0) return [];
   const { data, error } = await client.from("scheduled_workouts").select(COLUMNS).eq("user_id", userId).in("id", ids);
   if (error) {
-    if (MISSING_TABLE.has(error.code)) return [];
+    if (isMissingSchemaError(error)) return [];
     throw new Error(`Could not load planned workouts: ${error.message}`);
   }
   return toContract(data as Row[]);

@@ -25,10 +25,14 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const sub = data?.claims?.sub;
   if (!sub) return null;
 
-  const [{ data: profile }, { data: roles }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] = await Promise.all([
     supabase.from("profiles").select("display_name, onboarded_at").eq("id", sub).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", sub),
   ]);
+  // The session is valid even if these fail, so fall back to a plain runner,
+  // but log it: a missing schema otherwise only shows up as the name "Runner".
+  if (profileError) console.error(`[auth] Could not load profile (${profileError.code}): ${profileError.message}`);
+  if (rolesError) console.error(`[auth] Could not load roles (${rolesError.code}): ${rolesError.message}`);
 
   return {
     id: sub,

@@ -1,6 +1,7 @@
 import "server-only";
 import type { WorkoutType } from "@/lib/contracts";
 import type { RunnerContext } from "@/features/dashboard/context";
+import { DatabaseQueryError } from "@/lib/supabase/errors";
 
 export type WorkoutRow = {
   id: string;
@@ -52,7 +53,7 @@ export async function listCompletedWorkouts(ctx: RunnerContext, limit = 1000): P
     .eq("status", "completed")
     .order("started_at", { ascending: false })
     .limit(limit);
-  if (error) throw new Error(error.message);
+  if (error) throw new DatabaseQueryError("workout_logs", error);
   return (data ?? []).map(toWorkoutRow);
 }
 

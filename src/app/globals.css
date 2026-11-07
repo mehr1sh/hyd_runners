@@ -5,8 +5,9 @@
 /*
  * HYD Runners design tokens.
  * Brand colours are sampled from public/branding/hyd-runners-logo.png.
- * Contrast ratios and usage rules are recorded in docs/DESIGN_SYSTEM.md —
- * change a token there first, then here.
+ * WCAG 2.2 AA: red text is always brand-red-strong (#E31E25 is 4.37:1 on
+ * off-white, below AA); brand-red is for fills, icons and large accents.
+ * Never put red on navy (2.59:1). Re-check ratios when a token changes.
  */
 
 @custom-variant dark (&:is(.dark *));

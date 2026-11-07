@@ -1,6 +1,7 @@
 import "server-only";
 import { CommunityEvent, Location } from "@/lib/contracts";
 import { isSupabaseConfigured } from "@/lib/env";
+import { DatabaseQueryError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 /** Upcoming published events, soonest first. RLS limits rows to what the caller may see. */
@@ -14,7 +15,7 @@ export async function listUpcomingEvents(limit = 20): Promise<CommunityEvent[]> 
     .gte("ends_at", new Date().toISOString())
     .order("starts_at", { ascending: true })
     .limit(limit);
-  if (error) throw new Error(`Could not load events: ${error.message}`);
+  if (error) throw new DatabaseQueryError("events", { ...error, message: `Could not load events: ${error.message}` });
 
   return (data ?? []).map((row) =>
     CommunityEvent.parse({

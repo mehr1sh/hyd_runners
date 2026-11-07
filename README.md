@@ -6,95 +6,146 @@
 
 A beginner-friendly running, fitness and community platform for Hyderabad. It helps new runners build a **consistent habit** with plans that fit around **changing timetables**.
 
-This repository holds the shared application foundation: routes, layout, design system, contracts, auth and database foundation. Feature work happens on the three feature branches described in [CONTRIBUTING.md](CONTRIBUTING.md).
+## Features
 
-| Doc                                              | What it covers                                           |
-| ------------------------------------------------ | -------------------------------------------------------- |
-| [docs/TECH_DECISIONS.md](docs/TECH_DECISIONS.md) | Approved stack, pinned versions, architecture rules      |
-| [docs/CONTRACTS.md](docs/CONTRACTS.md)           | Shared types, ids, date formats, API envelope and errors |
-| [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)   | Brand palette, contrast decisions, components            |
-| [CONTRIBUTING.md](CONTRIBUTING.md)               | Branches, commits, file ownership, PR and testing rules  |
-| [DEPLOYMENT.md](DEPLOYMENT.md)                   | Vercel + Supabase setup and environment variables        |
-| [PROJECT_STATUS.md](PROJECT_STATUS.md)           | What is done, what is next, who owns what                |
+- **Onboarding and profile:** running experience, what gets in the way, training preferences and home spots.
+- **Today dashboard:** the next session, the week's plan, streaks, XP, coins, level, badges, an evolving character and weekly challenges.
+- **Programmes:** Couch to 5K, strength and conditioning, mobility and recovery plans with progress tracking.
+- **Workouts:** a guided timer or manual logging. Rewards are computed on the server and granted exactly once.
+- **Schedule planner:** upload a timetable (PDF or image) or enter busy times, confirm them, then generate, edit and approve a training week. Works without AI; Gemini adds image and scanned-PDF reading.
+- **Reports:** weekly, monthly and yearly training summaries.
+- **Community:** weekly leaderboard, announcements, feedback and in-app messages; group-run events with RSVPs; a map of parks, tracks and lake loops.
+- **Staff tools:** coaches answer feedback and message runners; programme managers publish announcements, events and location updates. Roles: `runner`, `coach`, `mentor`, `programme_manager`, `admin`.
 
-## Stack
+## Tech stack
 
-Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · Supabase (PostgreSQL, Auth, Storage, RLS) · Zod · Recharts · Leaflet · Claude (server-side, optional) · Vitest + Playwright · Vercel.
+Next.js 16 (App Router, TypeScript, Turbopack) · React 19 · Tailwind CSS 4 + shadcn/ui · Supabase (PostgreSQL, Auth, Storage, Row Level Security) · Zod · Recharts · Leaflet · Gemini (server-side, optional) · Vitest, Playwright and pgTAP · Vercel.
 
-## Local setup
+## Project structure
 
-**Prerequisites:** Node.js 22+, pnpm 11 (`corepack enable`), and Docker (for the local Supabase stack).
-
-```bash
-pnpm install                 # installs exact versions from pnpm-lock.yaml
-pnpm exec playwright install chromium
-
-pnpm db:start                # starts local Supabase in Docker, applies migrations and seed
-cp .env.example .env.local   # then paste the API URL, Publishable key and Secret key printed by db:start
-                             # (run `pnpm exec supabase status` to see them again)
-pnpm dev                     # http://localhost:3000
+```
+src/
+  app/            routes: (marketing), (auth), (app) signed-in pages, api/v1 REST endpoints, auth/callback
+  components/     ui/ (shadcn primitives), layout/, shared/, charts/, map/
+  features/       one folder per area: identity, scheduler, workouts, gamification, community, reports, dashboard
+  lib/            contracts/ (shared Zod schemas), supabase/ (clients, errors), auth/, api/, ai/, env
+  proxy.ts        refreshes the session and redirects signed-out visitors from protected routes
+supabase/
+  migrations/     the only way to change the schema
+  tests/database/ pgTAP Row Level Security tests
+  seed.sql        local sample data (labelled "sample"); never runs in production
+tests/
+  unit/           Vitest
+  e2e/            Playwright (desktop + mobile)
+.github/workflows/
+  ci.yml          lint, typecheck, unit, RLS, build and e2e on every PR
+  db-deploy.yml   manual, approved migration deploys to the hosted project
 ```
 
-- Local Studio (database UI): http://127.0.0.1:54323
-- Local email inbox (Mailpit): http://127.0.0.1:54324. Email confirmation is off locally, so sign-up signs you in straight away.
-- **Without Supabase** (`.env.local` empty), the app runs in _preview mode_: every screen renders, and sign-in and data are disabled.
+Every table has RLS and the browser only holds the publishable key. The secret key, AI keys and privileged writes stay on the server (`server-only` imports enforce this).
 
-To give yourself a staff role locally, run this in Studio's SQL editor:
+## Prerequisites
+
+- Node.js 22+
+- pnpm 11 (`corepack enable`)
+- Docker, running (for the local Supabase stack)
+
+## Environment variables
+
+Copy the template to `.env.local` in the project root (gitignored), then fill it in:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable                                                                                  | Value                                                                                         |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | Printed by `pnpm db:start` (again with `pnpm exec supabase status`)                           |
+| `NEXT_PUBLIC_SITE_URL`                                                                    | The URL the app is served on, e.g. `http://localhost:3000`; used in auth email links          |
+| `AI_PROVIDER`                                                                             | `none` (default) or `gemini`                                                                  |
+| `GEMINI_API_KEY`, `GEMINI_MODEL`                                                          | Only when `AI_PROVIDER=gemini`                                                                |
+| `AI_DAILY_CALL_LIMIT`                                                                     | AI calls per user per day (default `10`)                                                      |
+| `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_ATTRIBUTION`                                 | Map tiles; defaults to OpenStreetMap (light use only). Use a commercial provider for real use |
+| `DEMO_SEED_TOKEN`                                                                         | Optional; enables `POST /api/v1/dev/seed-demo` in production. Leave empty                     |
+
+Without Supabase variables the app runs in _preview mode_: every screen renders, sign-in and data are disabled. `NEXT_PUBLIC_*` values are compiled in at build time, so restart or rebuild after changing them.
+
+## Run, build and test locally
+
+```bash
+pnpm install                          # exact versions from pnpm-lock.yaml
+pnpm exec playwright install chromium
+pnpm db:start                         # local Supabase in Docker: applies migrations and seed
+pnpm dev                              # http://localhost:3000
+```
+
+Locally, email confirmation is off (sign-up signs you in), Studio is at http://127.0.0.1:54323 and the Mailpit inbox at http://127.0.0.1:54324. To make yourself staff, run in Studio's SQL editor:
 
 ```sql
 insert into public.user_roles (user_id, role)
 select id, 'programme_manager' from auth.users where email = 'you@example.com';
 ```
 
-## Scripts
+| Command                                        | Does                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm build` / `pnpm start`                    | Production build / serve it                                            |
+| `pnpm lint` · `pnpm typecheck` · `pnpm format` | ESLint · TypeScript · Prettier                                         |
+| `pnpm test`                                    | Vitest unit tests; Supabase-backed ones run when the local stack is up |
+| `pnpm db:test`                                 | pgTAP RLS tests                                                        |
+| `pnpm test:e2e`                                | Playwright against `pnpm start` on port 3000 (build first)             |
+| `pnpm verify`                                  | lint + typecheck + unit tests + build                                  |
 
-| Command                                        | Does                                                                  |
-| ---------------------------------------------- | --------------------------------------------------------------------- |
-| `pnpm dev`                                     | Dev server (Turbopack)                                                |
-| `pnpm build` / `pnpm start`                    | Production build / serve it                                           |
-| `pnpm lint` · `pnpm typecheck` · `pnpm format` | ESLint · TypeScript · Prettier                                        |
-| `pnpm test`                                    | Vitest unit tests (`tests/unit`)                                      |
-| `pnpm test:e2e`                                | Playwright, desktop + mobile (`tests/e2e`). Needs `pnpm build` first. |
-| `pnpm verify`                                  | lint + typecheck + unit tests + build: run before every PR            |
-| `pnpm db:start` / `db:stop`                    | Local Supabase stack                                                  |
-| `pnpm db:new <name>`                           | New migration file                                                    |
-| `pnpm db:reset`                                | Rebuild the local DB from migrations + seed                           |
-| `pnpm db:test`                                 | pgTAP RLS tests (`supabase/tests`)                                    |
-| `pnpm db:types`                                | Generate `src/lib/supabase/database.types.ts` from the local schema   |
+Full check, as CI runs it (local Supabase up):
 
-## Project structure
-
-```
-src/
-  app/
-    (marketing)/          public landing page
-    (auth)/               sign-in, sign-up
-    (app)/                signed-in app: dashboard, onboarding, schedule, programmes,
-                          workouts, reports, community, events, map, profile, coach, manager
-    api/v1/               REST endpoints (shared with the future mobile app)
-    auth/callback/        email confirmation / OAuth code exchange
-  components/
-    ui/                   shadcn/ui primitives (shared — lead)
-    layout/ brand/ shared/ charts/ map/
-  features/               one folder per feature area (identity, scheduler, workouts,
-                          gamification, community, reports)
-  lib/
-    contracts/            shared Zod schemas + types (single source of truth)
-    supabase/             browser, server, admin (secret) clients and the session proxy helper
-    auth/                 current user, role guard, API caller resolution
-    api/                  response envelope helpers
-    ai/                   provider-neutral AI interface (server only)
-  proxy.ts                session refresh + redirect for protected routes
-supabase/
-  migrations/             SQL migrations (only way to change the schema)
-  tests/database/         pgTAP tests
-  seed.sql                local sample data (clearly labelled)
-tests/
-  unit/  e2e/
+```bash
+pnpm verify && pnpm db:test
+AI_PROVIDER=none pnpm test:e2e
 ```
 
-## Security notes
+`pnpm test:e2e` reuses any server already on port 3000; stop old `dev`/`start` servers first or use `PORT=3200 pnpm test:e2e`. The opt-in scheduler API integration tests run with `SCHEDULER_INTEGRATION=1` and the `.env.local` values exported.
 
-- Every table has Row Level Security. The browser only ever holds the publishable key.
-- The secret key, AI keys, timetable processing and privileged writes stay on the server (`server-only` imports enforce this).
-- Never commit `.env.local` or any real key.
+Tests that create accounts or write data run only when `NEXT_PUBLIC_SUPABASE_URL` points at the local stack (`127.0.0.1`/`localhost`); they skip themselves against any hosted project. To check a deployment without writing anything, run the read-only spec as the dedicated test account:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://<deployment> E2E_RUNNER_EMAIL=… E2E_RUNNER_PASSWORD=… pnpm exec playwright test test-account smoke app-shells
+```
+
+## Supabase migrations
+
+- Every schema change is a new file in `supabase/migrations/`, created with `pnpm db:new <name>`. Files run in order of their timestamp prefix.
+- Supabase records applied migrations **by version (the timestamp) only**. Never edit, rename or reuse the version of a migration that has been applied anywhere shared; add a new migration instead.
+- Reference data the app needs (programmes, sessions, badges) lives in migrations. `seed.sql` is local sample data only.
+- Locally: `pnpm db:reset` rebuilds from migrations and seed (wipes data); `pnpm exec supabase migration up --local` applies new migrations and keeps data.
+- Hosted projects are migrated only by the **Deploy database migrations** workflow, never from a laptop.
+
+## Deployment
+
+Vercel Production (branch `main`) and Preview (every other branch and PR) use the **same Supabase project**. Previews therefore act on real data, so they get only the publishable key:
+
+| Variable                                                           | Production | Preview  |
+| ------------------------------------------------------------------ | ---------- | -------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes        | yes      |
+| `NEXT_PUBLIC_SITE_URL` = `https://hydrunners.vercel.app`           | yes        | yes      |
+| `SUPABASE_SECRET_KEY`, `DEMO_SEED_TOKEN`                           | yes        | **no**   |
+| AI and map variables                                               | yes        | optional |
+
+On a Preview deployment, RLS applies to everything, sign-up is turned off, the demo seed is disabled and saving workouts (which needs the secret key) shows "not available on this deployment". Sign in with a dedicated test account that has only the `runner` role; never give test accounts staff roles, since staff actions such as announcements and events are visible in production. Previews never run migrations, and a branch that adds a migration previews against the current schema.
+
+**Supabase (Mumbai region)**
+
+1. Settings → API Keys: the publishable (`sb_publishable_…`) and secret (`sb_secret_…`) keys. The secret key goes only in server-side variables; the build refuses a secret key in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+2. Authentication → URL Configuration: Site URL `https://hydrunners.vercel.app`, redirect URL `https://hydrunners.vercel.app/auth/callback`. Keep "Confirm email" on.
+
+**Vercel:** import the repository (Next.js and pnpm are detected), set the function region to `bom1`, and add the variables with the scopes above.
+
+**Migrations (GitHub Actions)**
+
+The GitHub environment `production` holds the variable `SUPABASE_PROJECT_ID` and the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, and requires a reviewer's approval. Run **Actions → Deploy database migrations → Run workflow** from `main` and type `migrate production`. The job waits for approval, checks that CI passed for that commit, prints a dry run and applies pending migrations. Nothing else migrates the hosted database: not merges, not Vercel builds, not tests. CI also fails if two migrations share a version.
+
+**Release order**
+
+1. Merge to `main` after CI passes; Vercel deploys production.
+2. Run the migration workflow and check the dry run lists only the expected migrations.
+3. Check `https://hydrunners.vercel.app/api/v1/health` reports `"supabaseConfigured":true`, then sign in and open the dashboard. Until migrations are applied the dashboard shows a "not available yet" notice instead of data.
+
+Free Supabase projects pause after a week without activity; open the site the day before a demo.

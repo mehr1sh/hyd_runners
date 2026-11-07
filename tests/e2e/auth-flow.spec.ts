@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { usesLocalDatabase, WRITES_DATA } from "./support/database";
+
+// Writes accounts and data: never against the shared Production/Preview database.
+test.skip(!usesLocalDatabase(), WRITES_DATA);
 
 /** Full sign-up → protected page → sign-out flow. Runs only when Supabase is configured. */
 test("a new runner can sign up, reach the app and sign out", async ({ page, request }, testInfo) => {
