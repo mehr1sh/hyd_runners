@@ -1,6 +1,6 @@
-name: Deploy database migrations
+name: Preview production database migrations
 
-# Applies supabase/migrations to the hosted Supabase project, which Vercel
+# Previews supabase/migrations against the hosted Supabase project, which Vercel
 # Production and Preview share. Manual only: merges and Vercel deployments
 # never migrate the database. Credentials live in the protected "production"
 # GitHub environment (required reviewers). Never run `supabase db push` from
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "migrate production" to apply migrations'
+        description: 'Type "preview production" to preview pending migrations'
         type: string
         required: true
 
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   push:
-    name: supabase db push (production)
+    name: supabase db push --dry-run (production)
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -67,11 +67,6 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       - name: Pending migrations (dry run)
         run: supabase db push --dry-run
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      - name: Apply migrations
-        run: supabase db push
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
