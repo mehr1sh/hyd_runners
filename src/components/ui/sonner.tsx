@@ -4,7 +4,7 @@ import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  // Light theme only for the first release (docs/TECH_DECISIONS.md).
+  // Light theme only for the first release.
   return (
     <Sonner
       theme="light"

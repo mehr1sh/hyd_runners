@@ -3,7 +3,7 @@ import { formatRange, fromMinutes, isLocalTime, toMinutes, weekdayName } from ".
 import type { AvailabilityDraft, AvailabilityIssue } from "./types";
 
 /**
- * Availability rules (documented in src/features/scheduler/README.md):
+ * Availability rules:
  *
  * - A block is a recurring weekly period: weekday + local start/end time. It
  *   cannot cross midnight (the contract requires end > start), so an overnight

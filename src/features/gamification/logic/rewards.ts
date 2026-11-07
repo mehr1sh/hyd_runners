@@ -1,6 +1,6 @@
 /**
  * Reward engine — the single source of truth for XP, coins, badges,
- * streak milestones and weekly challenges (rules: docs/RUNNER_EXPERIENCE.md).
+ * streak milestones and weekly challenges.
  *
  * `computeRewards(history)` is a pure function of the runner's completed
  * workouts. Every award carries a deterministic `awardKey`; the server

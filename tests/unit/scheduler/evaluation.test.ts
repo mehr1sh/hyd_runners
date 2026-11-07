@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Evaluation harness for docs/evaluation/schedule-planner.md. Assertions keep
+ * Evaluation harness for the schedule planner. Assertions keep
  * the measured guarantees from regressing; `EVAL_REPORT=1` prints the numbers:
  *
  *   EVAL_REPORT=1 pnpm exec vitest run tests/unit/scheduler/evaluation.test.ts

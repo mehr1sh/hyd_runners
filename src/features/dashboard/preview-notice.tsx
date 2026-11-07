@@ -4,7 +4,7 @@ import { PlaceholderNotice } from "@/components/shared/placeholder-notice";
 export function RunnerPreviewNotice({ feature }: { feature: string }) {
   return (
     <PlaceholderNotice feature={feature}>
-      Connect Supabase (see README → Local setup) to see your real workouts, rewards and progress.
+      Connect Supabase (see README → Environment variables) to see your real workouts, rewards and progress.
     </PlaceholderNotice>
   );
 }

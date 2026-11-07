@@ -8,7 +8,7 @@ import type { TimetableUpload } from "@/lib/contracts";
 
 export type TimetableMimeType = TimetableUpload["mimeType"];
 
-/** Matches `payload_too_large` in docs/CONTRACTS.md and the Storage bucket limit. */
+/** Matches the `payload_too_large` API error and the Storage bucket limit. */
 export const MAX_TIMETABLE_BYTES = 10 * 1024 * 1024;
 
 export const ACCEPTED_MIME_TYPES: readonly TimetableMimeType[] = [

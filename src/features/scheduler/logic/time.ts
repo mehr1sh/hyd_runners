@@ -3,7 +3,7 @@ import { LocalTime } from "@/lib/contracts";
 
 /**
  * Wall-clock helpers. Recurring availability is `weekday + HH:mm` in the
- * runner's timezone (docs/CONTRACTS.md); instants are UTC ISO strings. All
+ * runner's timezone; instants are UTC ISO strings. All
  * arithmetic on a recurring week happens in minutes since local midnight, so
  * no timezone conversion happens until a session is turned into an instant.
  */
