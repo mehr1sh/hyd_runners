@@ -1,36 +1,42 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
-import { PlaceholderNotice } from "@/components/shared/placeholder-notice";
+import { OnboardingWizard } from "@/features/identity/components/onboarding-form";
+import { loadOnboarding } from "@/features/identity/service";
+import { listLocations } from "@/features/community/queries";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isSupabaseConfigured } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Set up your plan" };
 
-const STEPS = [
-  { title: "Your goal", body: "Build a habit, finish your first 5K, run without stopping or get stronger." },
-  { title: "Where you are now", body: "New to running, returning after a break, or already running a little." },
-  { title: "Your timetable", body: "Upload a PDF or photo of your timetable, or mark busy times by hand." },
-  { title: "Your preferences", body: "Preferred days, time of day and how long a session can be." },
-];
+export default async function OnboardingPage() {
+  const user = await getCurrentUser();
 
-export default function OnboardingPage() {
   return (
     <>
-      <PageHeader title="Set up your plan" description="Four short steps. You can change any answer later." />
-      <div className="space-y-6">
-        <PlaceholderNotice feature="onboarding" owner="Planning" />
-        <ol className="grid gap-3">
-          {STEPS.map((step, i) => (
-            <li key={step.title} className="flex gap-4 rounded-xl border bg-card p-4">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-navy text-sm font-semibold text-white">
-                {i + 1}
-              </span>
-              <div>
-                <h2 className="font-semibold text-brand-navy">{step.title}</h2>
-                <p className="text-sm text-muted-foreground">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
+      <PageHeader
+        title="Set up your plan"
+        description="Tell us about your running, what gets in the way, and how you like to train. You can stop and continue later."
+      />
+      {!isSupabaseConfigured || !user ? (
+        <p className="text-sm text-muted-foreground">Sign in to save your setup. Nothing is stored in preview mode.</p>
+      ) : (
+        <OnboardingLoader userId={user.id} />
+      )}
     </>
+  );
+}
+
+async function OnboardingLoader({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const [record, locations] = await Promise.all([loadOnboarding(supabase, userId), listLocations()]);
+  if (!record.ok) {
+    return <p className="text-sm text-destructive">{record.message}</p>;
+  }
+  return (
+    <OnboardingWizard
+      record={record.data}
+      locations={locations.map((location) => ({ id: location.id, name: location.name, verified: location.verified }))}
+    />
   );
 }

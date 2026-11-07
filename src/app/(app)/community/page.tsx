@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { Megaphone, MessageSquare, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
-import { PlaceholderNotice } from "@/components/shared/placeholder-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setLeaderboardVisibilityAction } from "@/features/community/actions";
+import { AnnouncementList, type AnnouncementItem } from "@/features/community/components/announcement-list";
+import { FeedbackPanel } from "@/features/community/components/feedback-panel";
+import { MessagePanel } from "@/features/community/components/message-panel";
+import { listAnnouncements, listFeedback, listMessages, listRecipients } from "@/features/community/service";
 import { getRunnerContext } from "@/features/dashboard/context";
 import { formatLocalDate } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
@@ -21,7 +24,12 @@ export const metadata: Metadata = { title: "Community" };
 
 export default async function CommunityPage() {
   const ctx = await getRunnerContext();
-  const header = <PageHeader title="Community" description="This week's leaderboard, announcements and feedback." />;
+  const header = (
+    <PageHeader
+      title="Community"
+      description="This week's leaderboard, announcements, feedback and in-app messages. Nothing here sends email or push."
+    />
+  );
   if (!ctx)
     return (
       <>
@@ -29,17 +37,39 @@ export default async function CommunityPage() {
         <RunnerPreviewNotice feature="the community leaderboard" />
       </>
     );
-  const board = await loadLeaderboard(ctx);
+
+  const [board, announcements, feedback, messages, recipients] = await Promise.all([
+    loadLeaderboard(ctx),
+    listAnnouncements(ctx.supabase, ctx.user.id),
+    listFeedback(ctx.supabase, ctx.user.id),
+    listMessages(ctx.supabase, ctx.user.id),
+    listRecipients(ctx.supabase),
+  ]);
+  const announcementItems: AnnouncementItem[] = announcements.ok
+    ? announcements.data.map((item) => ({
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        publishAt: item.publishAt,
+        audience: item.audience,
+        unread: item.unread,
+        scheduled: item.scheduled,
+      }))
+    : [];
 
   return (
     <>
       {header}
       <Tabs defaultValue="leaderboard">
-        <TabsList>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          <TabsTrigger value="feedback">Feedback</TabsTrigger>
-        </TabsList>
+        {/* Four tabs: scroll on narrow phones instead of clipping. */}
+        <div className="max-w-full overflow-x-auto pb-1">
+          <TabsList>
+            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="leaderboard" className="space-y-4 pt-4">
           <Card>
@@ -137,21 +167,28 @@ export default async function CommunityPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="announcements" className="space-y-4 pt-4">
-          <PlaceholderNotice feature="announcements" />
-          <EmptyState
-            icon={Megaphone}
-            title="No announcements yet"
-            description="Coaches and programme managers will post updates here."
-          />
+        <TabsContent value="announcements" className="pt-4">
+          {announcements.ok ? (
+            <AnnouncementList items={announcementItems} />
+          ) : (
+            <p className="text-sm text-destructive">{announcements.message}</p>
+          )}
         </TabsContent>
-        <TabsContent value="feedback" className="space-y-4 pt-4">
-          <PlaceholderNotice feature="runner feedback" />
-          <EmptyState
-            icon={MessageSquare}
-            title="Feedback is coming soon"
-            description="Rate sessions, events and coaching."
-          />
+        <TabsContent value="feedback" className="pt-4">
+          {feedback.ok ? (
+            <FeedbackPanel items={feedback.data} mode="runner" />
+          ) : (
+            <p className="text-sm text-destructive">{feedback.message}</p>
+          )}
+        </TabsContent>
+        <TabsContent value="messages" className="pt-4">
+          {messages.ok && recipients.ok ? (
+            <MessagePanel messages={messages.data} recipients={recipients.data} viewerId={ctx.user.id} />
+          ) : (
+            <p className="text-sm text-destructive">
+              {!messages.ok ? messages.message : !recipients.ok ? recipients.message : "Could not load messages."}
+            </p>
+          )}
         </TabsContent>
       </Tabs>
     </>

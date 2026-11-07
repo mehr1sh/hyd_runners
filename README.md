@@ -19,21 +19,62 @@ This repository holds the shared application foundation: routes, layout, design 
 
 ## Stack
 
-Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · Supabase (PostgreSQL, Auth, Storage, RLS) · Zod · Recharts · Leaflet · Claude (server-side, optional) · Vitest + Playwright · Vercel.
+Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · Supabase (PostgreSQL, Auth, Storage, RLS) · Zod · Recharts · Leaflet · Gemini or Claude (server-side, optional) · Vitest + Playwright · Vercel.
 
-## Local setup
+## How to run
 
-**Prerequisites:** Node.js 22+, pnpm 11 (`corepack enable`), and Docker (for the local Supabase stack).
+**Prerequisites:** Node.js 22+, pnpm 11 (`corepack enable`; if `pnpm` is still not found, prefix commands with `corepack`, e.g. `corepack pnpm dev`), and Docker running (for the local Supabase stack).
+
+### 1. Install and start the database
 
 ```bash
 pnpm install                 # installs exact versions from pnpm-lock.yaml
 pnpm exec playwright install chromium
 
 pnpm db:start                # starts local Supabase in Docker, applies migrations and seed
-cp .env.example .env.local   # then paste the API URL, Publishable key and Secret key printed by db:start
-                             # (run `pnpm exec supabase status` to see them again)
-pnpm dev                     # http://localhost:3000
 ```
+
+Already ran `db:start` before pulling new migrations? Apply them with `pnpm exec supabase migration up --local` (keeps your data) or `pnpm db:reset` (wipes local data).
+
+### 2. Create `.env.local`
+
+`.env.local` lives in the **project root** (next to `package.json`), never in `src/`. It is gitignored.
+
+```bash
+cp .env.example .env.local
+```
+
+Fill it in:
+
+| Variable                                                                                  | Value                                                                                                                |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | API URL, Publishable key and Secret key printed by `pnpm db:start` (see them again with `pnpm exec supabase status`) |
+| `NEXT_PUBLIC_SITE_URL`                                                                    | The URL you open the app on, e.g. `http://localhost:3000`                                                            |
+| `AI_PROVIDER`                                                                             | `none` (default: text PDFs and manual entry only) or `gemini` (also reads timetable images and scanned PDFs)         |
+| `GEMINI_API_KEY`                                                                          | Your key from Google AI Studio (only when `AI_PROVIDER=gemini`)                                                      |
+| `GEMINI_MODEL`                                                                            | Defaults to `gemini-3.8-flash`. If it answers 503 "high demand", use `gemini-3.1-flash-lite`                         |
+| `AI_DAILY_CALL_LIMIT`                                                                     | AI calls allowed per user per day (default `10`)                                                                     |
+
+Next.js only reads `.env.local` at startup: restart the server after changing it.
+
+### 3. Start the app
+
+```bash
+pnpm dev                     # development, http://localhost:3000
+# or, closer to production:
+pnpm build && pnpm start
+```
+
+### 4. Try the schedule planner
+
+1. Sign up at `/sign-up` (no email confirmation locally).
+2. Open **Schedule**. Upload a timetable (PDF, PNG, JPG or WebP, up to 10 MB) or enter busy times by hand.
+3. Review the extracted rows, tick each one that is correct, and save. Nothing is used until you confirm it.
+4. Choose the week, press **Generate plan**, edit sessions if needed, then **Approve**.
+
+With `AI_PROVIDER=none`, text PDFs and manual entry still work; images need Gemini.
+
+### Local URLs
 
 - Local Studio (database UI): http://127.0.0.1:54323
 - Local email inbox (Mailpit): http://127.0.0.1:54324. Email confirmation is off locally, so sign-up signs you in straight away.
@@ -61,6 +102,27 @@ select id, 'programme_manager' from auth.users where email = 'you@example.com';
 | `pnpm db:reset`                                | Rebuild the local DB from migrations + seed                           |
 | `pnpm db:test`                                 | pgTAP RLS tests (`supabase/tests`)                                    |
 | `pnpm db:types`                                | Generate `src/lib/supabase/database.types.ts` from the local schema   |
+
+## Testing everything
+
+Run these with the local Supabase stack up (`pnpm db:start`):
+
+```bash
+pnpm verify                  # lint + typecheck + unit tests + build
+pnpm db:test                 # Row Level Security tests (pgTAP)
+
+# API integration tests through the real route handlers and local Supabase (opt-in)
+set -a; . ./.env.local; set +a
+SCHEDULER_INTEGRATION=1 pnpm exec vitest run tests/unit
+
+# End-to-end, desktop + mobile. Run with AI off, as CI does
+# (one step checks the "AI suggestions are not set up" notice).
+pnpm build
+AI_PROVIDER=none pnpm test:e2e
+```
+
+- `pnpm test:e2e` **reuses** any server already on port 3000. If a `pnpm dev` or an old `pnpm start` is running there, stop it first, or the tests run against stale code and fail with "Something went wrong". To use another port: `PORT=3200 pnpm test:e2e`.
+- No test calls the real AI provider (the Gemini adapter is tested with a stubbed `fetch`). To check your key by hand, set `AI_PROVIDER=gemini` and upload a timetable image on the Schedule page. A live call takes about 20 s.
 
 ## Project structure
 

@@ -7,8 +7,8 @@ Production runs on **Vercel** (Next.js web app and `/api/v1`) and **Supabase Clo
 1. Create a project at supabase.com in region **South Asia (Mumbai)**. Save the database password in the team password manager.
 2. **Settings → API Keys:** create (or copy) the **publishable** key (`sb_publishable_…`) and a **secret** key (`sb_secret_…`). Do not use the legacy `anon` / `service_role` keys; they are deprecated by the end of 2026.
 3. **Authentication → URL Configuration:**
-   - Site URL: `https://<your-domain>`
-   - Redirect URLs: `https://<your-domain>/auth/callback`, `https://*-<team>.vercel.app/auth/callback` (preview deployments)
+   - Site URL: `https://hydrunners.vercel.app`
+   - Redirect URLs: `https://hydrunners.vercel.app/auth/callback`, `https://*-<team>.vercel.app/auth/callback` (preview deployments)
 4. **Authentication → Providers → Email:** keep "Confirm email" **on** in production.
 5. Apply the schema through CI (step 3), not from the dashboard.
 
@@ -19,7 +19,7 @@ Production runs on **Vercel** (Next.js web app and `/api/v1`) and **Supabase Clo
 1. Import the GitHub repository in Vercel. The framework is detected as Next.js and pnpm is used from `packageManager`.
 2. **Settings → Functions → Region:** `bom1` (Mumbai).
 3. **Settings → Environment Variables:** add the variables below for **Production** and **Preview**.
-4. The Production branch is `main`. Every PR gets a preview URL.
+4. The repository's documented production branch is `main`; verify the Vercel project's actual Production Branch before cutover. Every PR should get a preview URL.
 
 Vercel's Hobby plan is for **non-commercial** use. That is fine for a student demo. Move to Pro before the product is monetised.
 
@@ -39,18 +39,20 @@ Do not run `supabase db push` from a laptop. If the hosted schema and the migrat
 
 ## Environment variables
 
-| Name                                   | Where           | Required                     | Purpose                                                      |
-| -------------------------------------- | --------------- | ---------------------------- | ------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Vercel (all)    | yes                          | `https://<ref>.supabase.co`                                  |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Vercel (all)    | yes                          | `sb_publishable_…`; safe in the browser because RLS applies  |
-| `NEXT_PUBLIC_SITE_URL`                 | Vercel (all)    | yes                          | Public URL, used for auth email links                        |
-| `SUPABASE_SECRET_KEY`                  | Vercel (server) | for AI jobs / admin tasks    | `sb_secret_…`; **bypasses RLS**; never `NEXT_PUBLIC_`        |
-| `AI_PROVIDER`                          | Vercel          | no (default `none`)          | `anthropic` or `none` (kill switch → deterministic fallback) |
-| `AI_MODEL`                             | Vercel          | no                           | Default `claude-haiku-5-5`                                   |
-| `ANTHROPIC_API_KEY`                    | Vercel (server) | when `AI_PROVIDER=anthropic` | Claude API key                                               |
-| `AI_DAILY_CALL_LIMIT`                  | Vercel          | no                           | Per-user daily AI calls (default 10)                         |
-| `NEXT_PUBLIC_MAP_TILE_URL`             | Vercel          | no                           | Leaflet tile template; default OpenStreetMap standard tiles  |
-| `NEXT_PUBLIC_MAP_ATTRIBUTION`          | Vercel          | no                           | Attribution HTML for the tile provider                       |
+| Name                                   | Where           | Required                  | Purpose                                                                                                        |
+| -------------------------------------- | --------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Vercel (all)    | yes                       | `https://<ref>.supabase.co`                                                                                    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Vercel (all)    | yes                       | `sb_publishable_…`; safe in the browser because RLS applies                                                    |
+| `NEXT_PUBLIC_SITE_URL`                 | Vercel (all)    | yes                       | Set Production to `https://hydrunners.vercel.app`; localhost defaults to `http://localhost:3000`               |
+| `SUPABASE_SECRET_KEY`                  | Vercel (server) | for AI jobs / admin tasks | `sb_secret_…`; **bypasses RLS**; never `NEXT_PUBLIC_`                                                          |
+| `AI_PROVIDER`                          | Vercel          | no (default `none`)       | `gemini` enables the implemented adapter; `none` uses deterministic fallback; `anthropic` currently falls back |
+| `GEMINI_API_KEY`                       | Vercel (server) | when `AI_PROVIDER=gemini` | Google AI Studio key                                                                                           |
+| `GEMINI_MODEL`                         | Vercel          | no                        | Default `gemini-3.8-flash`                                                                                     |
+| `AI_MODEL`                             | Vercel          | no                        | Parsed for a future Anthropic adapter; unused currently                                                        |
+| `ANTHROPIC_API_KEY`                    | Vercel (server) | no                        | Parsed for a future Anthropic adapter; unused currently                                                        |
+| `AI_DAILY_CALL_LIMIT`                  | Vercel          | no                        | Per-user daily AI calls (default 10)                                                                           |
+| `NEXT_PUBLIC_MAP_TILE_URL`             | Vercel          | no                        | Leaflet tile template; default OpenStreetMap standard tiles                                                    |
+| `NEXT_PUBLIC_MAP_ATTRIBUTION`          | Vercel          | no                        | Attribution HTML for the tile provider                                                                         |
 
 `NEXT_PUBLIC_*` values are compiled into the browser bundle at build time, so redeploy after changing them.
 

@@ -17,7 +17,7 @@ Every number shown to a runner is derived from persisted rows (`workout_logs`, `
 | Reports                          | `src/features/reports/logic/aggregate.ts`, `queries.ts`                                                                                    |
 | Schedule integration (read-only) | `src/features/workouts/planned-source.ts`                                                                                                  |
 | Events, RSVPs, map, leaderboard  | `src/features/community/`                                                                                                                  |
-| Database                         | `supabase/migrations/20261015090000_training_programmes.sql`, `…090100_training_workouts_rewards.sql`, `…090200_community_event_rsvps.sql` |
+| Database                         | `supabase/migrations/20261015100000_training_programmes.sql`, `…100100_training_workouts_rewards.sql`, `…100200_community_event_rsvps.sql` |
 
 ## Security model
 
