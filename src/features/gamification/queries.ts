@@ -1,6 +1,7 @@
 import "server-only";
 import type { RunnerContext } from "@/features/dashboard/context";
 import type { WorkoutRow } from "@/features/workouts/queries";
+import { DatabaseQueryError } from "@/lib/supabase/errors";
 import { BADGES } from "./logic/badges";
 import { challengeProgress } from "./logic/challenges";
 import { recoveryCheck } from "./logic/rewards";
@@ -14,8 +15,8 @@ export async function loadGamification(ctx: RunnerContext, completed: WorkoutRow
     ctx.supabase.from("xp_ledger").select("delta_xp, delta_coins, reason, award_key, occurred_at"),
     ctx.supabase.from("user_badges").select("badge_code, earned_at"),
   ]);
-  if (ledger.error) throw new Error(ledger.error.message);
-  if (badges.error) throw new Error(badges.error.message);
+  if (ledger.error) throw new DatabaseQueryError("xp_ledger", ledger.error);
+  if (badges.error) throw new DatabaseQueryError("user_badges", badges.error);
 
   const workouts = completed.map((w) => ({ startedAt: w.startedAt, durationSeconds: w.durationSeconds ?? 0 }));
   const built = buildAchievementSummary({

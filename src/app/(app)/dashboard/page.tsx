@@ -9,7 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { getRunnerContext } from "@/features/dashboard/context";
 import { formatDateTime, formatLocalDate } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
-import { loadDashboard, type TodayActivity } from "@/features/dashboard/queries";
+import { loadDashboardState, type TodayActivity } from "@/features/dashboard/queries";
+import { DashboardUnavailableNotice } from "@/features/dashboard/unavailable-notice";
 import { BadgeGrid, ChallengeList } from "@/features/gamification/components/achievement-panels";
 import { CharacterAvatar } from "@/features/gamification/components/character-avatar";
 import { startWorkoutAction } from "@/features/workouts/actions";
@@ -120,7 +121,16 @@ export default async function DashboardPage() {
       </>
     );
 
-  const d = await loadDashboard(ctx);
+  const state = await loadDashboardState(ctx);
+  if (state.status === "schema_missing")
+    return (
+      <>
+        <PageHeader title={`Hello, ${ctx.user.displayName}`} />
+        <DashboardUnavailableNotice />
+      </>
+    );
+
+  const d = state.data;
   const { summary, character, weekly, rank } = d.game;
 
   return (

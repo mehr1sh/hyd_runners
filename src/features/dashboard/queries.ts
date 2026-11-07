@@ -7,6 +7,7 @@ import { loadGamification } from "@/features/gamification/queries";
 import { listPlannedWorkouts } from "@/features/workouts/planned-source";
 import { listProgrammes } from "@/features/workouts/programme-queries";
 import { getInProgressWorkout, listCompletedWorkouts } from "@/features/workouts/queries";
+import { DatabaseQueryError, isMissingSchemaError } from "@/lib/supabase/errors";
 import type { RunnerContext } from "./context";
 
 export type TodayActivity =
@@ -122,4 +123,29 @@ export async function loadDashboard(ctx: RunnerContext) {
     message,
     totalWorkouts: completed.length,
   };
+}
+
+export type DashboardData = Awaited<ReturnType<typeof loadDashboard>>;
+
+export type DashboardState = { status: "ready"; data: DashboardData } | { status: "schema_missing"; source: string };
+
+/**
+ * loadDashboard for the page. When the database schema has not been deployed
+ * (missing tables, columns or relationships) the dashboard cannot work at all,
+ * so this returns an explicit `schema_missing` state and logs which relation
+ * is missing instead of failing the whole render. Any other query failure is
+ * rethrown for the route's error boundary.
+ */
+export async function loadDashboardState(ctx: RunnerContext): Promise<DashboardState> {
+  try {
+    return { status: "ready", data: await loadDashboard(ctx) };
+  } catch (error) {
+    if (!isMissingSchemaError(error)) throw error;
+    const source = error instanceof DatabaseQueryError ? error.source : "unknown";
+    console.error(
+      `[dashboard] Database schema is not deployed (${source}): ${(error as Error).message}. ` +
+        "Apply supabase/migrations to this project.",
+    );
+    return { status: "schema_missing", source };
+  }
 }

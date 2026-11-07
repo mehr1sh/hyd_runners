@@ -1,6 +1,7 @@
 import "server-only";
 import { TrainingProgramme, WorkoutBlock } from "@/lib/contracts";
 import type { RunnerContext } from "@/features/dashboard/context";
+import { DatabaseQueryError } from "@/lib/supabase/errors";
 import { localDate } from "@/features/gamification/logic/time";
 import { programmeProgress, type SessionRef } from "./logic/programme-progress";
 
@@ -44,7 +45,7 @@ async function myEnrollments(ctx: RunnerContext): Promise<EnrollmentRow[]> {
     .select("id, programme_id, status, started_at, completed_at")
     .eq("user_id", ctx.user.id)
     .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) throw new DatabaseQueryError("enrollments", error);
   return (data ?? []).map((e) => ({
     id: e.id,
     programmeId: e.programme_id,
@@ -68,7 +69,7 @@ async function completedSessions(ctx: RunnerContext, enrollmentIds: string[]) {
     .eq("status", "completed")
     .in("enrollment_id", enrollmentIds)
     .not("programme_session_id", "is", null);
-  if (error) throw new Error(error.message);
+  if (error) throw new DatabaseQueryError("workout_logs", error);
   return (data ?? []).map((r) => ({
     enrollmentId: r.enrollment_id as string,
     sessionId: r.programme_session_id as string,
@@ -97,7 +98,7 @@ export async function listProgrammes(ctx: RunnerContext) {
       .order("sort_order"),
     myEnrollments(ctx),
   ]);
-  if (error) throw new Error(error.message);
+  if (error) throw new DatabaseQueryError("programmes", error);
   const done = await completedSessions(
     ctx,
     enrollments.map((e) => e.id),
