@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutType } from "@/lib/contracts";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -13,7 +14,15 @@ import { logManualWorkout } from "@/features/workouts/service";
  * accounts flagged `user_metadata.demo = true` are ever modified.
  */
 
-export const DEMO_PASSWORD = "hyd-runners-demo";
+/**
+ * A fresh random password (144 bits, URL-safe) for each seed run. There is no
+ * fixed demo password: the demo runner's password is returned once, to the
+ * authorised caller, and the sample runners' passwords are never returned.
+ */
+export function generateDemoPassword() {
+  return randomBytes(18).toString("base64url");
+}
+
 export const DEMO_RUNNER = { email: "demo.runner@hydrunners.test", displayName: "Demo Runner (sample)" };
 const SAMPLE_RUNNERS = [
   { email: "sample.lakshmi@hydrunners.test", displayName: "Lakshmi (sample)", sessions: 3 },
@@ -22,7 +31,7 @@ const SAMPLE_RUNNERS = [
 ];
 const TZ = "Asia/Kolkata";
 
-async function upsertDemoUser(admin: SupabaseClient, email: string, displayName: string) {
+async function upsertDemoUser(admin: SupabaseClient, email: string, displayName: string, password: string) {
   const { data: page, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (error) throw new Error(error.message);
   const existing = page.users.find((u) => u.email === email);
@@ -41,11 +50,14 @@ async function upsertDemoUser(admin: SupabaseClient, email: string, displayName:
       const { error: e } = await admin.from(table).delete().eq("user_id", existing.id);
       if (e) throw new Error(e.message);
     }
+    // Rotate the password: earlier runs' passwords stop working.
+    const { error: passwordError } = await admin.auth.admin.updateUserById(existing.id, { password });
+    if (passwordError) throw new Error(passwordError.message);
     return existing.id;
   }
   const { data, error: createError } = await admin.auth.admin.createUser({
     email,
-    password: DEMO_PASSWORD,
+    password,
     email_confirm: true,
     user_metadata: { display_name: displayName, demo: true },
   });
@@ -61,7 +73,8 @@ export async function seedDemoData(now = new Date()) {
   const today = localDate(now, TZ);
 
   // 1. Demo runner: three weeks into Couch to 5K, plus some general fitness.
-  const demoId = await upsertDemoUser(admin, DEMO_RUNNER.email, DEMO_RUNNER.displayName);
+  const demoPassword = generateDemoPassword();
+  const demoId = await upsertDemoUser(admin, DEMO_RUNNER.email, DEMO_RUNNER.displayName, demoPassword);
   const { data: c25k } = await admin
     .from("programmes")
     .select("id, programme_sessions(id, week, day)")
@@ -159,7 +172,7 @@ export async function seedDemoData(now = new Date()) {
 
   // 2. Sample runners with activity this week, so the leaderboard has company.
   for (const r of SAMPLE_RUNNERS) {
-    const id = await upsertDemoUser(admin, r.email, r.displayName);
+    const id = await upsertDemoUser(admin, r.email, r.displayName, generateDemoPassword());
     for (let i = 0; i < r.sessions; i++) {
       const date = addDays(today, -i * 2);
       await logManualWorkout(
@@ -184,7 +197,7 @@ export async function seedDemoData(now = new Date()) {
 
   return {
     demoEmail: DEMO_RUNNER.email,
-    demoPassword: DEMO_PASSWORD,
+    demoPassword,
     sampleRunners: SAMPLE_RUNNERS.map((r) => r.email),
   };
 }
