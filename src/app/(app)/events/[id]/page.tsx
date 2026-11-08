@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, MapPin, Megaphone, Settings, Users } from "lucide-react";
 import { z } from "zod";
+import { RouteMap } from "@/components/map/route-map";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,31 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
               )}
             </div>
           </section>
+
+          {detail.route && (
+            <section className="space-y-2" aria-labelledby="event-route">
+              <h2 id="event-route" className="font-semibold text-brand-navy">
+                Route
+              </h2>
+              <p className="text-sm">
+                <Link href={`/routes/${detail.route.slug}`} className="underline underline-offset-4">
+                  {detail.route.name}
+                </Link>{" "}
+                <span className="text-muted-foreground">
+                  · {(Number(detail.route.distance_m) / 1000).toFixed(2)} km{detail.route.is_loop ? " loop" : ""}
+                </span>
+              </p>
+              {detail.route.route_geojson && (
+                <RouteMap
+                  label={`Map of ${detail.route.name}`}
+                  className="h-[260px]"
+                  lines={[
+                    { id: event.id, name: detail.route.name, coordinates: detail.route.route_geojson.coordinates },
+                  ]}
+                />
+              )}
+            </section>
+          )}
 
           {paceGroups.length > 0 && (
             <section className="space-y-2" aria-labelledby="pace-groups">

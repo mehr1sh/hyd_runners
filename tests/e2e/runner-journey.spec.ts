@@ -86,11 +86,13 @@ test("a new runner completes a Couch to 5K session and earns rewards exactly onc
   await page.getByRole("button", { name: "Show me" }).click();
   await expect(page.getByText("Other runners can see you on the leaderboard.")).toBeVisible();
 
-  // RSVP to the seeded sample event, then cancel.
-  await page.goto("/events");
-  const event = page.getByRole("listitem").filter({ hasText: "Sample: Beginner walk-run" });
-  await event.getByRole("button", { name: "I'm going" }).click();
-  await expect(event.getByText("You're going", { exact: true })).toBeVisible();
-  await event.getByRole("button", { name: "Cancel my place" }).click();
-  await expect(event.getByRole("button", { name: "I'm going" })).toBeVisible();
+  // RSVP to the seeded sample event (supabase/seed.sql), then cancel. Its page is
+  // opened directly: the list is paged and other test runs add upcoming events.
+  await page.goto("/events/00000000-0000-4000-8000-000000000201");
+  await expect(page.getByRole("heading", { name: "Sample: Beginner walk-run" })).toBeVisible();
+  const place = page.getByRole("region", { name: "Your place" });
+  await place.getByRole("button", { name: "I'm going" }).click();
+  await expect(place.getByText("You're going", { exact: true })).toBeVisible();
+  await place.getByRole("button", { name: "Cancel my place" }).click();
+  await expect(place.getByRole("button", { name: "I'm going" })).toBeVisible();
 });

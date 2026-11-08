@@ -13,6 +13,7 @@ import { formatDateTime } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { PaceGroupManager, Roster, TeamList, UpdateComposer } from "@/features/events/components/manage-panels";
 import { getEventDetail, getRoster } from "@/features/events/queries";
+import { routeOptions } from "@/features/routes/queries";
 
 export const metadata: Metadata = { title: "Manage event" };
 
@@ -32,10 +33,11 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
   if (!detail.canStaff) return <AccessDenied area="Event management" />;
 
   const isManager = ctx.user.roles.includes("programme_manager") || ctx.user.roles.includes("admin");
-  const [roster, locations, people] = await Promise.all([
+  const [roster, locations, people, routes] = await Promise.all([
     getRoster(ctx.supabase, id),
     detail.canManage ? listLocations() : Promise.resolve([]),
     isManager ? listPeople(ctx.supabase, ctx.user.id) : Promise.resolve(null),
+    detail.canManage ? routeOptions(ctx.supabase) : Promise.resolve([]),
   ]);
   const { event } = detail;
   const team = detail.team
@@ -71,7 +73,7 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
         </TabsContent>
         {detail.canManage && (
           <TabsContent value="details" className="pt-4">
-            <EventForm event={event} locations={locations} />
+            <EventForm event={event} locations={locations} routes={routes} />
           </TabsContent>
         )}
         {detail.canManage && (
