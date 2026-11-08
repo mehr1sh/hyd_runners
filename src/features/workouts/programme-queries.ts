@@ -5,7 +5,7 @@ import { DatabaseQueryError } from "@/lib/supabase/errors";
 import { localDate } from "@/features/gamification/logic/time";
 import { programmeProgress, type SessionRef } from "./logic/programme-progress";
 
-export type ProgrammeCategory = "couch_to_5k" | "general_fitness" | "training_and_shine";
+export type ProgrammeCategory = "couch_to_5k" | "running" | "general_fitness" | "training_and_shine";
 
 export type EnrollmentRow = {
   id: string;

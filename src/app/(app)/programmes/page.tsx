@@ -14,6 +14,11 @@ export const metadata: Metadata = { title: "Programmes" };
 const SECTIONS: { category: ProgrammeCategory; title: string; description: string }[] = [
   { category: "couch_to_5k", title: "Couch to 5K", description: "From walking to running 5 km in nine weeks." },
   {
+    category: "running",
+    title: "Running plans",
+    description: "From your first jogs to a half marathon: 5K, 10K, endurance and half-marathon plans.",
+  },
+  {
     category: "general_fitness",
     title: "General fitness",
     description: "Yoga, upper body, mobility, strength and recovery.",
