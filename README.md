@@ -41,6 +41,7 @@ tests/
   ci.yml          lint, format, typecheck, RLS, unit + integration, build and e2e on every PR
   db-deploy.yml   manual dry run of pending migrations against the hosted project (no writes)
   db-apply.yml    manual apply of pending migrations to the hosted project
+  db-verify.yml   manual, read-only check that the hosted schema matches the migrations
 ```
 
 Every table has RLS and the browser only holds the publishable key. The secret key, AI keys and privileged writes stay on the server (`server-only` imports enforce this).
@@ -163,6 +164,8 @@ There are two manual workflows, both run from `main`, both using that environmen
 
 1. **Actions → Preview production database migrations → Run workflow**, type `preview production`. Checks that CI passed for that exact commit on `main`, then prints `supabase db push --dry-run`. It writes nothing.
 2. **Actions → Apply production database migrations → Run workflow**, type `migrate production`. Waits for the environment approval (once configured), repeats the CI check and the dry run, then applies the pending migrations.
+
+After an apply, run **Actions → Verify production database schema** (read-only): it lists the applied migrations and fails if the production `public`/`private` schema differs from the one built from `supabase/migrations`.
 
 Nothing else migrates the hosted database: not merges, not Vercel builds, not tests. CI also fails if two migrations share a version.
 
