@@ -25,6 +25,8 @@ const CHAIN = [
   "like",
   "or",
   "is",
+  "range",
+  "ilike",
 ];
 
 export const missingTable = (table: string): QueryResult => ({
@@ -56,14 +58,62 @@ export function fakeSupabase(
       const { data, error } = resolve(query);
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error };
     };
-    builder.then = (onFulfilled: (r: QueryResult) => unknown, onRejected?: (e: unknown) => unknown) =>
-      Promise.resolve(resolve(query)).then(onFulfilled, onRejected);
+    builder.then = (onFulfilled: (r: QueryResult) => unknown, onRejected?: (e: unknown) => unknown) => {
+      const result = resolve(query);
+      // select(columns, { count: "exact", head: true }) answers with a count.
+      const counted = query.calls.some(
+        (c) => c.method === "select" && (c.args[1] as { count?: string } | undefined)?.count,
+      );
+      const value = counted
+        ? { ...result, count: Array.isArray(result.data) ? result.data.length : 0, data: null }
+        : result;
+      return Promise.resolve(value).then(onFulfilled, onRejected);
+    };
     return builder;
+  }
+
+  /**
+   * Database functions. `rpc:<name>` in `tables` overrides; otherwise the
+   * aggregates are derived from the configured tables, as the real functions
+   * derive them from the caller's rows.
+   */
+  async function rpc(name: string, args: Record<string, unknown> = {}): Promise<QueryResult> {
+    const override = tables[`rpc:${name}`];
+    if (override) return typeof override === "function" ? override({ table: `rpc:${name}`, calls: [] }) : override;
+    if (name === "my_reward_totals") {
+      const ledger = resolve({ table: "xp_ledger", calls: [] });
+      if (ledger.error) return ledger;
+      const rows = (ledger.data ?? []) as { delta_xp: number; delta_coins: number }[];
+      return {
+        data: [
+          {
+            total_xp: rows.reduce((s, r) => s + r.delta_xp, 0),
+            total_coins: rows.reduce((s, r) => s + r.delta_coins, 0),
+            ledger_rows: rows.length,
+          },
+        ],
+        error: null,
+      };
+    }
+    if (name === "my_active_dates") {
+      const logs = resolve({ table: "workout_logs", calls: [{ method: "eq", args: ["status", "completed"] }] });
+      if (logs.error) return logs;
+      const format = new Intl.DateTimeFormat("en-CA", { timeZone: String(args.p_timezone ?? "UTC") });
+      const min = Number(args.p_min_seconds ?? 0);
+      const rows = (logs.data ?? []) as { started_at: string; duration_seconds: number | null }[];
+      const dates = [
+        ...new Set(
+          rows.filter((r) => (r.duration_seconds ?? 0) >= min).map((r) => format.format(new Date(r.started_at))),
+        ),
+      ].sort();
+      return { data: dates, error: null };
+    }
+    return { data: null, error: null };
   }
 
   return {
     from,
-    rpc: async () => ({ data: [], error: null }),
+    rpc,
     auth: { getClaims: async () => ({ data: claims ? { claims } : null, error: null }) },
     queries,
   };

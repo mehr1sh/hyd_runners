@@ -5,31 +5,49 @@ import { DatabaseQueryError } from "@/lib/supabase/errors";
 import { BADGES } from "./logic/badges";
 import { challengeProgress } from "./logic/challenges";
 import { recoveryCheck } from "./logic/rewards";
-import { WEEKLY_GOAL_DAYS } from "./logic/streaks";
+import { MIN_ACTIVE_SECONDS, WEEKLY_GOAL_DAYS } from "./logic/streaks";
 import { buildAchievementSummary } from "./logic/summary";
-import { localDate, weekStart } from "./logic/time";
+import { addDays, localDate, localMidnightUtc, weekStart, type LocalDate } from "./logic/time";
 
-/** Achievement summary + weekly challenge progress from persisted records. */
-export async function loadGamification(ctx: RunnerContext, completed: WorkoutRow[]) {
-  const [ledger, badges] = await Promise.all([
-    ctx.supabase.from("xp_ledger").select("delta_xp, delta_coins, reason, award_key, occurred_at"),
+/**
+ * Achievement summary + weekly challenge progress from persisted records.
+ * Lifetime totals and streak dates come from database aggregates, so they are
+ * complete however long the history is; `recent` only needs this week.
+ */
+export async function loadGamification(ctx: RunnerContext, recent: WorkoutRow[]) {
+  const since = localMidnightUtc(addDays(ctx.today, -7), ctx.timezone).toISOString();
+  const [totals, dates, ledger, badges] = await Promise.all([
+    ctx.supabase.rpc("my_reward_totals"),
+    ctx.supabase.rpc("my_active_dates", { p_timezone: ctx.timezone, p_min_seconds: MIN_ACTIVE_SECONDS }),
+    ctx.supabase
+      .from("xp_ledger")
+      .select("reason, occurred_at")
+      .eq("reason", "workout_completed")
+      .gte("occurred_at", since)
+      .limit(100),
     ctx.supabase.from("user_badges").select("badge_code, earned_at"),
   ]);
+  if (totals.error) throw new DatabaseQueryError("my_reward_totals", totals.error);
+  if (dates.error) throw new DatabaseQueryError("my_active_dates", dates.error);
   if (ledger.error) throw new DatabaseQueryError("xp_ledger", ledger.error);
   if (badges.error) throw new DatabaseQueryError("user_badges", badges.error);
 
-  const workouts = completed.map((w) => ({ startedAt: w.startedAt, durationSeconds: w.durationSeconds ?? 0 }));
+  // A one-row set: [{ total_xp, total_coins, ledger_rows }].
+  const sums = ((totals.data as { total_xp: number; total_coins: number }[] | null) ?? [])[0] ?? {
+    total_xp: 0,
+    total_coins: 0,
+  };
   const built = buildAchievementSummary({
     userId: ctx.user.id,
-    ledger: (ledger.data ?? []).map((r) => ({ deltaXp: r.delta_xp, deltaCoins: r.delta_coins })),
+    totals: { xp: Number(sums.total_xp), coins: Number(sums.total_coins) },
     badges: (badges.data ?? []).map((b) => ({ code: b.badge_code, earnedAt: new Date(b.earned_at).toISOString() })),
-    workouts,
+    activeDates: ((dates.data as string[] | null) ?? []) as LocalDate[],
     timezone: ctx.timezone,
     today: ctx.today,
   });
 
   const thisWeek = weekStart(ctx.today);
-  const weekWorkouts = completed
+  const weekWorkouts = recent
     .filter((w) => weekStart(localDate(w.startedAt, ctx.timezone)) === thisWeek)
     .map((w) => ({
       id: w.id,

@@ -2,11 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Role } from "@/lib/contracts";
 import { CommunityEvent, Location } from "@/lib/contracts";
 import { dbFailure, type ServiceResult } from "@/features/shared/db";
+import { isMissingSchemaError } from "@/lib/supabase/errors";
 import { canManageCommunity, hasAnyRole, MANAGER_ROLES } from "./logic/access";
 import { AnnouncementView, LocationUpdate, type DirectMessage } from "./logic/content";
 import { isUnread } from "./logic/dates";
 import { ParticipationFeedback, barrierToTarget, type FeedbackDraft } from "./logic/feedback";
 import { reportedTargetIds } from "./moderation";
+
+export const FEEDBACK_LIMIT = 100;
+export const MESSAGE_LIMIT = 200;
+export const LIST_LIMIT = 100;
+const ASSIGNMENT_LIMIT = 100;
 
 function iso(value: string) {
   return new Date(value).toISOString();
@@ -46,18 +52,48 @@ export async function submitFeedback(supabase: SupabaseClient, userId: string, i
   return { ok: true as const, data: mapFeedback(data) };
 }
 
+type ReplyRow = {
+  id: string;
+  feedback_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  hidden_at?: string | null;
+};
+type MessageRow = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  created_at: string;
+  hidden_at?: string | null;
+};
+
+async function readReplies(supabase: SupabaseClient, feedbackIds: string[]) {
+  const read = (columns: string) =>
+    supabase
+      .from("feedback_replies")
+      .select(columns)
+      .in("feedback_id", feedbackIds)
+      .order("created_at", { ascending: true });
+  let result = await read("id, feedback_id, author_id, body, created_at, hidden_at");
+  // hidden_at arrives with the moderation migration; read without it until then.
+  if (result.error && isMissingSchemaError(result.error))
+    result = await read("id, feedback_id, author_id, body, created_at");
+  return { data: (result.data ?? []) as unknown as ReplyRow[], error: result.error };
+}
+
 export async function listFeedback(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase.from("feedback").select("*").order("created_at", { ascending: false });
+  // Newest FEEDBACK_LIMIT items (RLS scopes them to the viewer).
+  const { data, error } = await supabase
+    .from("feedback")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(FEEDBACK_LIMIT);
   if (error) return dbFailure(error, "Could not load feedback.");
   const rows = data ?? [];
   const ids = rows.map((row) => row.id as string);
-  const replies = ids.length
-    ? await supabase
-        .from("feedback_replies")
-        .select("id, feedback_id, author_id, body, created_at, hidden_at")
-        .in("feedback_id", ids)
-        .order("created_at", { ascending: true })
-    : { data: [], error: null };
+  const replies = ids.length ? await readReplies(supabase, ids) : { data: [] as ReplyRow[], error: null };
   if (replies.error) return dbFailure(replies.error, "Could not load replies.");
 
   const names = await displayNames(supabase, [
@@ -166,7 +202,8 @@ export async function listAnnouncements(supabase: SupabaseClient, userId: string
   const { data, error } = await supabase
     .from("announcements")
     .select("id, author_id, audience, audience_id, title, body, publish_at")
-    .order("publish_at", { ascending: false });
+    .order("publish_at", { ascending: false })
+    .limit(LIST_LIMIT);
   if (error) return dbFailure(error, "Could not load announcements.");
   const ids = (data ?? []).map((row) => row.id as string);
   const reads = ids.length
@@ -253,7 +290,8 @@ export async function listLocationUpdates(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("location_updates")
     .select("id, location_id, author_id, title, body, publish_at")
-    .order("publish_at", { ascending: false });
+    .order("publish_at", { ascending: false })
+    .limit(LIST_LIMIT);
   if (error) return dbFailure(error, "Could not load location updates.");
   return {
     ok: true as const,
@@ -335,7 +373,10 @@ export async function listManagedEvents(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("events")
     .select("id, title, description, starts_at, ends_at, location_id, capacity, status, created_by")
-    .order("starts_at", { ascending: true });
+    // Upcoming events and those of the last 30 days; older ones are history.
+    .gte("ends_at", new Date(Date.now() - 30 * 86_400_000).toISOString())
+    .order("starts_at", { ascending: true })
+    .limit(LIST_LIMIT);
   if (error) return dbFailure(error, "Could not load events.");
   return {
     ok: true as const,
@@ -388,12 +429,15 @@ export async function saveEvent(
 }
 
 export async function listMessages(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("id, sender_id, recipient_id, body, created_at, hidden_at")
-    .order("created_at", { ascending: true });
+  const read = (columns: string) =>
+    supabase.from("messages").select(columns).order("created_at", { ascending: false }).limit(MESSAGE_LIMIT);
+  let { data, error } = await read("id, sender_id, recipient_id, body, created_at, hidden_at");
+  // hidden_at arrives with the moderation migration; read without it until then.
+  if (error && isMissingSchemaError(error))
+    ({ data, error } = await read("id, sender_id, recipient_id, body, created_at"));
   if (error) return dbFailure(error, "Could not load messages.");
-  const rows = (data ?? []).map((row) => ({
+  // Newest MESSAGE_LIMIT, shown oldest first.
+  const rows = [...((data ?? []) as unknown as MessageRow[])].reverse().map((row) => ({
     ...({
       id: row.id,
       senderId: row.sender_id,
@@ -449,43 +493,90 @@ export async function sendMessage(supabase: SupabaseClient, userId: string, reci
   return { ok: true as const, data: null };
 }
 
-export async function listPeople(supabase: SupabaseClient, userId: string) {
+export const PEOPLE_PAGE_SIZE = 25;
+
+/**
+ * One page of people (optionally filtered by name) with their roles, every
+ * coach/mentor/manager for the assignment form, and the newest assignments.
+ * Paged so the manager area keeps working past the API's 1000-row cap.
+ */
+export async function listPeople(
+  supabase: SupabaseClient,
+  userId: string,
+  options: { query?: string; page?: number } = {},
+) {
   const manager = await requireManager(supabase, userId);
   if (!manager.ok) return manager;
-  const [
-    { data: profiles, error: profileError },
-    { data: roles, error: rolesError },
-    { data: assignments, error: assignmentError },
-  ] = await Promise.all([
-    supabase.from("profiles").select("id, display_name").order("display_name"),
-    supabase.from("user_roles").select("user_id, role"),
+  const page = Math.max(0, Math.floor(options.page ?? 0));
+  const query = (options.query ?? "").trim().slice(0, 60);
+
+  let profilesQuery = supabase
+    .from("profiles")
+    .select("id, display_name", { count: "exact" })
+    .order("display_name")
+    .order("id")
+    .range(page * PEOPLE_PAGE_SIZE, page * PEOPLE_PAGE_SIZE + PEOPLE_PAGE_SIZE - 1);
+  // PostgREST pattern: escape the LIKE wildcards the user typed.
+  if (query) profilesQuery = profilesQuery.ilike("display_name", `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+
+  const [profiles, staffRoles, assignments] = await Promise.all([
+    profilesQuery,
+    supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["coach", "mentor", "programme_manager", "admin"])
+      .limit(1000),
     supabase
       .from("coach_assignments")
-      .select("id, coach_id, runner_id, created_at")
-      .order("created_at", { ascending: false }),
+      .select("id, coach_id, runner_id, created_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .limit(ASSIGNMENT_LIMIT),
   ]);
-  if (profileError) return dbFailure(profileError, "Could not load people.");
-  if (rolesError) return dbFailure(rolesError, "Could not load roles.");
-  if (assignmentError) return dbFailure(assignmentError, "Could not load assignments.");
-  const roleMap = new Map<string, Role[]>();
-  for (const row of roles ?? []) {
-    const list = roleMap.get(row.user_id) ?? [];
-    list.push(row.role as Role);
-    roleMap.set(row.user_id, list);
-  }
+  if (profiles.error) return dbFailure(profiles.error, "Could not load people.");
+  if (staffRoles.error) return dbFailure(staffRoles.error, "Could not load roles.");
+  if (assignments.error) return dbFailure(assignments.error, "Could not load assignments.");
+
+  const pageIds = (profiles.data ?? []).map((p) => p.id as string);
+  const pageRoles = pageIds.length
+    ? await supabase.from("user_roles").select("user_id, role").in("user_id", pageIds)
+    : { data: [], error: null };
+  if (pageRoles.error) return dbFailure(pageRoles.error, "Could not load roles.");
+
+  const rolesOf = (rows: { user_id: string; role: string }[]) => {
+    const map = new Map<string, Role[]>();
+    for (const row of rows) map.set(row.user_id, [...(map.get(row.user_id) ?? []), row.role as Role]);
+    return map;
+  };
+  const pageRoleMap = rolesOf(pageRoles.data ?? []);
+  const staffRoleMap = rolesOf(staffRoles.data ?? []);
+  const names = await displayNames(supabase, [
+    ...staffRoleMap.keys(),
+    ...(assignments.data ?? []).flatMap((a) => [a.coach_id as string, a.runner_id as string]),
+  ]);
+
   return {
     ok: true as const,
     data: {
-      people: (profiles ?? []).map((profile) => ({
+      people: (profiles.data ?? []).map((profile) => ({
         id: profile.id as string,
         displayName: profile.display_name as string,
-        roles: roleMap.get(profile.id) ?? [],
+        roles: pageRoleMap.get(profile.id) ?? [],
       })),
-      assignments: (assignments ?? []).map((row) => ({
+      total: profiles.count ?? 0,
+      page,
+      pageSize: PEOPLE_PAGE_SIZE,
+      query,
+      staff: [...staffRoleMap.entries()]
+        .map(([id, roles]) => ({ id, displayName: names.get(id) ?? "Member", roles }))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName)),
+      assignments: (assignments.data ?? []).map((row) => ({
         id: row.id as string,
         coachId: row.coach_id as string,
         runnerId: row.runner_id as string,
+        coachName: names.get(row.coach_id) ?? "Member",
+        runnerName: names.get(row.runner_id) ?? "Member",
       })),
+      assignmentsTotal: assignments.count ?? 0,
     },
   };
 }
@@ -547,7 +638,8 @@ export async function listLocations(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("locations")
     .select("id, name, kind, latitude, longitude, address, verified")
-    .order("name");
+    .order("name")
+    .limit(500);
   if (error) return dbFailure(error, "Could not load locations.");
   return {
     ok: true as const,

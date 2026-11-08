@@ -58,7 +58,9 @@ export default async function ManagerPage({ searchParams }: PageProps<"/manager"
       : "announcements";
   const auditBefore =
     typeof sp.auditBefore === "string" && /^\d{1,18}$/.test(sp.auditBefore) ? Number(sp.auditBefore) : undefined;
-  const data = await load(user.id, isAdmin, auditBefore);
+  const peopleQuery = typeof sp.people === "string" ? sp.people : "";
+  const peoplePage = typeof sp.page === "string" && /^\d{1,4}$/.test(sp.page) ? Number(sp.page) : 0;
+  const data = await load(user.id, isAdmin, auditBefore, { query: peopleQuery, page: peoplePage });
 
   return (
     <>
@@ -117,7 +119,7 @@ export default async function ManagerPage({ searchParams }: PageProps<"/manager"
                 items={data.feedback.data}
                 mode="manager"
                 viewerId={user.id}
-                staff={(data.people.ok ? data.people.data.people : []).filter((person) =>
+                staff={(data.people.ok ? data.people.data.staff : []).filter((person) =>
                   person.roles.some((role) => role === "coach" || role === "mentor" || role === "programme_manager"),
                 )}
               />
@@ -127,7 +129,7 @@ export default async function ManagerPage({ searchParams }: PageProps<"/manager"
           </TabsContent>
           <TabsContent value="people" className="pt-4">
             {data.people.ok ? (
-              <PeopleForms people={data.people.data.people} assignments={data.people.data.assignments} />
+              <PeopleForms {...data.people.data} />
             ) : (
               <p className="text-sm text-destructive">{data.people.message}</p>
             )}
@@ -170,7 +172,12 @@ export default async function ManagerPage({ searchParams }: PageProps<"/manager"
   );
 }
 
-async function load(userId: string, isAdmin: boolean, auditBefore: number | undefined) {
+async function load(
+  userId: string,
+  isAdmin: boolean,
+  auditBefore: number | undefined,
+  peopleOptions: { query: string; page: number },
+) {
   const supabase = await createClient();
   const [announcements, events, locations, updates, feedback, people, messages, recipients, reports, audit] =
     await Promise.all([
@@ -179,7 +186,7 @@ async function load(userId: string, isAdmin: boolean, auditBefore: number | unde
       listLocations(supabase),
       listLocationUpdates(supabase),
       listFeedback(supabase, userId),
-      listPeople(supabase, userId),
+      listPeople(supabase, userId, peopleOptions),
       listMessages(supabase, userId),
       listRecipients(supabase),
       listReportQueue(supabase),

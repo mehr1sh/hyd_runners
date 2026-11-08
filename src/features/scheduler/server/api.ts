@@ -28,6 +28,8 @@ export async function requireCaller(
 /** Log the failure class only (no bodies, no personal data) and return a safe 500. */
 export function internalError(context: string, error: unknown, message = "Something went wrong. Please try again.") {
   const code = (error as { code?: string } | null)?.code;
+  // Per-user limits are enforced in the database (SQLSTATE PT429).
+  if (code === "PT429") return fail("rate_limited", "You've uploaded a lot recently. Please wait and try again later.");
   const name = (error as { name?: string } | null)?.name;
   console.error(`[scheduler] ${context} failed: ${name ?? "Error"}${code ? ` (${code})` : ""}`);
   return fail("internal_error", message);

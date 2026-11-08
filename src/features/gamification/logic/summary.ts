@@ -20,18 +20,24 @@ export function activeDates(workouts: ActivityRow[], tz: string): LocalDate[] {
   ];
 }
 
-export function buildAchievementSummary(input: {
-  userId: string;
-  ledger: LedgerRow[];
-  badges: BadgeRow[];
-  workouts: ActivityRow[];
-  timezone: string;
-  today: LocalDate;
-}) {
-  const totalXp = input.ledger.reduce((s, r) => s + r.deltaXp, 0);
-  const coins = input.ledger.reduce((s, r) => s + r.deltaCoins, 0);
+/**
+ * Totals and active dates can be passed pre-aggregated (from the database,
+ * covering the whole history) instead of as raw rows, which the Data API caps
+ * at 1000.
+ */
+export function buildAchievementSummary(
+  input: {
+    userId: string;
+    badges: BadgeRow[];
+    timezone: string;
+    today: LocalDate;
+  } & ({ ledger: LedgerRow[] } | { totals: { xp: number; coins: number } }) &
+    ({ workouts: ActivityRow[] } | { activeDates: LocalDate[] }),
+) {
+  const totalXp = "totals" in input ? input.totals.xp : input.ledger.reduce((s, r) => s + r.deltaXp, 0);
+  const coins = "totals" in input ? input.totals.coins : input.ledger.reduce((s, r) => s + r.deltaCoins, 0);
   const lp = levelProgress(totalXp);
-  const dates = activeDates(input.workouts, input.timezone);
+  const dates = "activeDates" in input ? input.activeDates : activeDates(input.workouts, input.timezone);
   const daily = dailyStreak(dates, input.today);
   const weekly = weeklyStreak(dates, input.today);
   const character = characterStage(input.badges.map((b) => b.code));

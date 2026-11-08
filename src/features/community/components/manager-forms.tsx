@@ -324,18 +324,47 @@ export function LocationForm() {
 
 export function PeopleForms({
   people,
+  staff,
   assignments,
+  total,
+  page,
+  pageSize,
+  query,
+  assignmentsTotal,
 }: {
   people: { id: string; displayName: string; roles: string[] }[];
-  assignments: { id: string; coachId: string; runnerId: string }[];
+  staff: { id: string; displayName: string; roles: string[] }[];
+  assignments: { id: string; coachId: string; runnerId: string; coachName: string; runnerName: string }[];
+  total: number;
+  page: number;
+  pageSize: number;
+  query: string;
+  assignmentsTotal: number;
 }) {
-  const staff = people.filter((person) => person.roles.some((role) => role === "coach" || role === "mentor"));
+  const coaches = staff.filter((person) => person.roles.some((role) => role === "coach" || role === "mentor"));
   const [grantState, grantAction, grantPending] = useActionState(grantRoleAction, idle);
   const [assignState, assignAction, assignPending] = useActionState(assignCoachAction, idle);
-  const name = (id: string) => people.find((person) => person.id === id)?.displayName ?? id.slice(0, 8);
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const pageHref = (n: number) =>
+    `/manager?tab=people${query ? `&people=${encodeURIComponent(query)}` : ""}${n > 0 ? `&page=${n}` : ""}`;
 
   return (
     <div className="space-y-6">
+      <form method="get" action="/manager" className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
+        <input type="hidden" name="tab" value="people" />
+        <label className="grid flex-1 gap-1 text-sm">
+          Find people by name
+          <Input name="people" defaultValue={query} maxLength={60} placeholder="Name" />
+        </label>
+        <Button type="submit" variant="outline">
+          Search
+        </Button>
+      </form>
+      <p className="text-sm text-muted-foreground" role="status">
+        {total === 0
+          ? "Nobody matches."
+          : `Showing ${page * pageSize + 1}–${Math.min(total, (page + 1) * pageSize)} of ${total}. The person and runner lists below use these results.`}
+      </p>
       <form
         action={grantAction}
         className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_10rem_auto] sm:items-end"
@@ -372,7 +401,7 @@ export function PeopleForms({
             <option value="" disabled>
               Choose
             </option>
-            {staff.map((person) => (
+            {coaches.map((person) => (
               <option key={person.id} value={person.id}>
                 {person.displayName}
               </option>
@@ -392,27 +421,32 @@ export function PeopleForms({
             ))}
           </select>
         </label>
-        <Button type="submit" disabled={assignPending || staff.length === 0}>
+        <Button type="submit" disabled={assignPending || coaches.length === 0}>
           {assignPending ? "Assigning…" : "Assign"}
         </Button>
         <Note state={assignState} />
       </form>
-      <ul className="divide-y rounded-xl border bg-card">
+      <ul className="divide-y rounded-xl border bg-card" aria-label="Coach assignments">
         {assignments.length === 0 && <li className="p-4 text-sm text-muted-foreground">No coach assignments yet.</li>}
         {assignments.map((assignment) => (
           <li key={assignment.id} className="flex items-center justify-between gap-3 p-4 text-sm">
             <span>
-              {name(assignment.coachId)} → {name(assignment.runnerId)}
+              {assignment.coachName} → {assignment.runnerName}
             </span>
             <RemoveAssignmentForm assignmentId={assignment.id} />
           </li>
         ))}
+        {assignmentsTotal > assignments.length && (
+          <li className="p-4 text-sm text-muted-foreground">
+            Showing the newest {assignments.length} of {assignmentsTotal} assignments.
+          </li>
+        )}
       </ul>
       <p className="text-sm text-muted-foreground">
         Removing someone&apos;s last staff role also removes their runner assignments and returns feedback assigned to
         them to the unassigned queue. Their past messages, replies and enrolment decisions are kept.
       </p>
-      <ul className="divide-y rounded-xl border bg-card">
+      <ul className="divide-y rounded-xl border bg-card" aria-label="People">
         {people.map((person) => (
           <li key={person.id} className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
             <span className="font-medium text-brand-navy">{person.displayName}</span>
@@ -422,6 +456,23 @@ export function PeopleForms({
           </li>
         ))}
       </ul>
+      {pages > 1 && (
+        <nav aria-label="People pages" className="flex items-center gap-4 text-sm">
+          {page > 0 && (
+            <a href={pageHref(page - 1)} className="underline underline-offset-2">
+              Previous
+            </a>
+          )}
+          <span className="text-muted-foreground">
+            Page {page + 1} of {pages}
+          </span>
+          {page + 1 < pages && (
+            <a href={pageHref(page + 1)} className="underline underline-offset-2">
+              Next
+            </a>
+          )}
+        </nav>
+      )}
     </div>
   );
 }

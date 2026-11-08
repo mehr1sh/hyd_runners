@@ -1,16 +1,24 @@
 import "server-only";
 import type { ReportPeriod } from "@/lib/contracts";
 import type { RunnerContext } from "@/features/dashboard/context";
-import { activeDates } from "@/features/gamification/logic/summary";
-import { localMidnightUtc, addDays, dateRange } from "@/features/gamification/logic/time";
-import { listCompletedWorkouts } from "@/features/workouts/queries";
+import { MIN_ACTIVE_SECONDS } from "@/features/gamification/logic/streaks";
+import { localMidnightUtc, addDays, dateRange, type LocalDate } from "@/features/gamification/logic/time";
+import { DatabaseQueryError } from "@/lib/supabase/errors";
+import { listCompletedWorkoutsBetween } from "@/features/workouts/queries";
 import { listPlannedWorkouts } from "@/features/workouts/planned-source";
 import { buildReport, periodRange } from "./logic/aggregate";
 
 export async function loadReport(ctx: RunnerContext, period: ReportPeriod, offset: number) {
   const range = periodRange(period, ctx.today, offset);
-  const [workouts, planned, enrollments, badges] = await Promise.all([
-    listCompletedWorkouts(ctx, 5000),
+  const [workouts, allActive, planned, enrollments, badges] = await Promise.all([
+    // Only the period itself, paged so long periods are complete.
+    listCompletedWorkoutsBetween(
+      ctx,
+      localMidnightUtc(range.start, ctx.timezone),
+      localMidnightUtc(addDays(range.end, 1), ctx.timezone),
+    ),
+    // Every active day ever, aggregated in the database, for streaks.
+    ctx.supabase.rpc("my_active_dates", { p_timezone: ctx.timezone, p_min_seconds: MIN_ACTIVE_SECONDS }),
     listPlannedWorkouts(ctx.supabase, ctx.user.id, {
       from: localMidnightUtc(range.start, ctx.timezone),
       to: localMidnightUtc(addDays(range.end, 1), ctx.timezone),
@@ -21,6 +29,8 @@ export async function loadReport(ctx: RunnerContext, period: ReportPeriod, offse
       .eq("user_id", ctx.user.id),
     ctx.supabase.from("user_badges").select("badge_code, earned_at"),
   ]);
+
+  if (allActive.error) throw new DatabaseQueryError("my_active_dates", allActive.error);
 
   // Planned = scheduled workouts when the planner has them; otherwise the
   // weekly session targets of programmes that were active in the period.
@@ -51,10 +61,7 @@ export async function loadReport(ctx: RunnerContext, period: ReportPeriod, offse
       workoutType: w.workoutType,
       planned: !!(w.programmeSessionId || w.plannedWorkoutId),
     })),
-    allActiveDates: activeDates(
-      workouts.map((w) => ({ startedAt: w.startedAt, durationSeconds: w.durationSeconds ?? 0 })),
-      ctx.timezone,
-    ),
+    allActiveDates: ((allActive.data as string[] | null) ?? []) as LocalDate[],
     plannedCount,
     timezone: ctx.timezone,
     today: ctx.today,

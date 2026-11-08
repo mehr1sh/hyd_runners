@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutType } from "@/lib/contracts";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isMissingSchemaError } from "@/lib/supabase/errors";
 import { reconcileRewards } from "@/features/gamification/service";
 import type { Award } from "@/features/gamification/logic/types";
 import { getPlannedWorkouts } from "./planned-source";
@@ -26,7 +27,7 @@ import { checkPlausibility, type CompletionInput, type ManualWorkoutInput } from
 
 export class WorkoutError extends Error {
   constructor(
-    public code: "not_found" | "forbidden" | "conflict" | "validation_failed",
+    public code: "not_found" | "forbidden" | "conflict" | "validation_failed" | "rate_limited",
     message: string,
   ) {
     super(message);
@@ -106,6 +107,29 @@ function mapUniqueViolation(error: { code?: string; message: string }): never {
   throw new Error(error.message);
 }
 
+/**
+ * Workouts are written with the secret key on the runner's behalf, so the
+ * per-runner limit is consumed explicitly (public.consume_rate_limit, callable
+ * only by the service role). Concurrent requests are serialised in the database.
+ */
+async function consumeWorkoutLimit(admin: SupabaseClient, userId: string) {
+  const { error } = await admin.rpc("consume_rate_limit", { p_user_id: userId, p_bucket: "workout" });
+  if (!error) return;
+  // Between a deploy and its migration the limiter does not exist yet; never
+  // block workouts because of that.
+  if (isMissingSchemaError(error)) {
+    console.warn("[workouts] rate limiter not deployed yet; skipping");
+    return;
+  }
+  if (error.code === "PT429") {
+    throw new WorkoutError(
+      "rate_limited",
+      "You have logged a lot of workouts in a short time. Please wait a few minutes and try again.",
+    );
+  }
+  throw new Error(error.message);
+}
+
 /** Start a workout (or return the one already in progress for the same target). */
 export async function startWorkout(userId: string, target: StartTarget, admin = createAdminClient()) {
   const link = await resolveTarget(admin, userId, target);
@@ -135,6 +159,7 @@ export async function startWorkout(userId: string, target: StartTarget, admin = 
       .maybeSingle();
     if (done) throw new WorkoutError("conflict", "You have already completed this session.");
   }
+  await consumeWorkoutLimit(admin, userId);
 
   const { data, error } = await admin
     .from("workout_logs")
@@ -229,6 +254,8 @@ export async function logManualWorkout(
     .eq("idempotency_key", input.idempotencyKey)
     .maybeSingle();
   if (existing) return { workoutId: existing.id as string, alreadyCompleted: true, newAwards: [] };
+  // Simulated workouts come only from the labelled demo seed.
+  if (options.source !== "simulated") await consumeWorkoutLimit(admin, userId);
 
   const link: Link = input.link
     ? await resolveTarget(admin, userId, input.link)

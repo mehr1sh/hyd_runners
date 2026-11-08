@@ -45,8 +45,12 @@ export function toWorkoutRow(r: Raw): WorkoutRow {
   };
 }
 
-/** Completed workouts, newest first (RLS limits to the caller). */
-export async function listCompletedWorkouts(ctx: RunnerContext, limit = 1000): Promise<WorkoutRow[]> {
+/**
+ * The most recent completed workouts, newest first (RLS limits to the caller).
+ * For lifetime figures use countCompletedWorkouts or the database aggregates;
+ * the Data API never returns more than 1000 rows.
+ */
+export async function listCompletedWorkouts(ctx: RunnerContext, limit = 200): Promise<WorkoutRow[]> {
   const { data, error } = await ctx.supabase
     .from("workout_logs")
     .select(COLUMNS)
@@ -55,6 +59,40 @@ export async function listCompletedWorkouts(ctx: RunnerContext, limit = 1000): P
     .limit(limit);
   if (error) throw new DatabaseQueryError("workout_logs", error);
   return (data ?? []).map(toWorkoutRow);
+}
+
+/** How many workouts the caller has completed, counted in the database (not capped by the API page size). */
+export async function countCompletedWorkouts(ctx: RunnerContext): Promise<number> {
+  const { count, error } = await ctx.supabase
+    .from("workout_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "completed");
+  if (error) throw new DatabaseQueryError("workout_logs", error);
+  return count ?? 0;
+}
+
+/**
+ * Every completed workout that started in [from, to), oldest first, read in
+ * pages over a stable order so a long period is never cut off at the API's
+ * 1000-row cap.
+ */
+export async function listCompletedWorkoutsBetween(ctx: RunnerContext, from: Date, to: Date): Promise<WorkoutRow[]> {
+  const PAGE = 500;
+  const rows: WorkoutRow[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await ctx.supabase
+      .from("workout_logs")
+      .select(COLUMNS)
+      .eq("status", "completed")
+      .gte("started_at", from.toISOString())
+      .lt("started_at", to.toISOString())
+      .order("started_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new DatabaseQueryError("workout_logs", error);
+    rows.push(...(data ?? []).map(toWorkoutRow));
+    if ((data ?? []).length < PAGE) return rows;
+  }
 }
 
 export async function getInProgressWorkout(ctx: RunnerContext): Promise<WorkoutRow | null> {
@@ -105,6 +143,6 @@ export async function getWorkout(ctx: RunnerContext, id: string) {
 }
 
 export async function listLocationOptions(ctx: RunnerContext) {
-  const { data } = await ctx.supabase.from("locations").select("id, name").order("name");
+  const { data } = await ctx.supabase.from("locations").select("id, name").order("name").limit(500);
   return (data ?? []) as { id: string; name: string }[];
 }

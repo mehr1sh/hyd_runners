@@ -73,10 +73,21 @@ export async function getPlannedWorkouts(
   ids: string[],
 ): Promise<PlannedWorkout[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await client.from("scheduled_workouts").select(COLUMNS).eq("user_id", userId).in("id", ids);
-  if (error) {
-    if (isMissingSchemaError(error)) return [];
-    throw new Error(`Could not load planned workouts: ${error.message}`);
+  // Chunked: keeps each request URL short and each response under the
+  // Data API's 1000-row cap, however many workouts reference a plan.
+  const unique = [...new Set(ids)];
+  const rows: Row[] = [];
+  for (let i = 0; i < unique.length; i += 200) {
+    const { data, error } = await client
+      .from("scheduled_workouts")
+      .select(COLUMNS)
+      .eq("user_id", userId)
+      .in("id", unique.slice(i, i + 200));
+    if (error) {
+      if (isMissingSchemaError(error)) return [];
+      throw new Error(`Could not load planned workouts: ${error.message}`);
+    }
+    rows.push(...((data ?? []) as Row[]));
   }
-  return toContract(data as Row[]);
+  return toContract(rows);
 }
