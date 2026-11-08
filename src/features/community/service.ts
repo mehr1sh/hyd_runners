@@ -408,10 +408,11 @@ export async function saveEvent(
     locationId: string | null;
     capacity: number | null;
     status: "draft" | "published" | "cancelled";
+    category: string;
+    meetingPoint: string | null;
+    registrationClosesAt: string | null;
   },
 ) {
-  const manager = await requireManager(supabase, userId);
-  if (!manager.ok) return manager;
   const row = {
     title: input.title,
     description: input.description,
@@ -420,12 +421,26 @@ export async function saveEvent(
     location_id: input.locationId,
     capacity: input.capacity,
     status: input.status,
+    category: input.category,
+    meeting_point: input.meetingPoint,
+    registration_closes_at: input.registrationClosesAt,
   };
-  const { error } = input.id
-    ? await supabase.from("events").update(row).eq("id", input.id)
-    : await supabase.from("events").insert({ ...row, created_by: userId });
+  if (input.id) {
+    // Managers and the event's organisers may edit (RLS); zero rows means neither.
+    const { error, count } = await supabase.from("events").update(row, { count: "exact" }).eq("id", input.id);
+    if (error) return dbFailure(error, "Could not save that event.");
+    if (count === 0) return { ok: false as const, code: "forbidden" as const, message: "You can't edit that event." };
+    return { ok: true as const, data: { id: input.id } };
+  }
+  const manager = await requireManager(supabase, userId);
+  if (!manager.ok) return manager;
+  const { data, error } = await supabase
+    .from("events")
+    .insert({ ...row, created_by: userId })
+    .select("id")
+    .single();
   if (error) return dbFailure(error, "Could not save that event.");
-  return { ok: true as const, data: null };
+  return { ok: true as const, data: { id: data.id as string } };
 }
 
 export async function listMessages(supabase: SupabaseClient, userId: string) {

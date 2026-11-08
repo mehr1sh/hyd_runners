@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EventExtras } from "@/features/events/logic";
 import { Announcement, AnnouncementAudience, EventStatus, LocationKind } from "@/lib/contracts";
 import { localDateTimeToIso } from "./dates";
 
@@ -106,6 +107,13 @@ export function parseLocationUpdateForm(formData: FormData) {
 }
 
 export function parseEventForm(formData: FormData) {
+  const closesRaw = String(formData.get("registrationClosesAt") ?? "");
+  const extras = EventExtras.safeParse({
+    category: formData.get("category") ?? "group_run",
+    meetingPoint: formData.get("meetingPoint") ?? "",
+    registrationClosesAt: closesRaw ? localDateTimeToIso(closesRaw) : null,
+  });
+  if (!extras.success) return firstIssue(extras.error);
   const starts = localDateTimeToIso(String(formData.get("startsAt") ?? ""));
   const ends = localDateTimeToIso(String(formData.get("endsAt") ?? ""));
   const capacityRaw = formData.get("capacity");
@@ -120,7 +128,10 @@ export function parseEventForm(formData: FormData) {
     status: formData.get("status"),
   });
   if (!parsed.success) return firstIssue(parsed.error);
-  return { ok: true as const, data: parsed.data };
+  if (extras.data.registrationClosesAt && extras.data.registrationClosesAt > parsed.data.endsAt) {
+    return { ok: false as const, message: "Registration must close before the event ends." };
+  }
+  return { ok: true as const, data: { ...parsed.data, ...extras.data } };
 }
 
 export function parseMessageForm(formData: FormData) {

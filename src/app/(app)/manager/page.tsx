@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlaceholderNotice } from "@/components/shared/placeholder-notice";
@@ -96,10 +97,37 @@ export default async function ManagerPage({ searchParams }: PageProps<"/manager"
           </TabsContent>
           <TabsContent value="events" className="space-y-4 pt-4">
             <EventForm locations={data.locations.ok ? data.locations.data : []} />
-            {data.events.ok &&
-              data.events.data.map((event) => (
-                <EventForm key={event.id} event={event} locations={data.locations.ok ? data.locations.data : []} />
-              ))}
+            {data.events.ok && (
+              <ul className="divide-y rounded-xl border bg-card text-sm" aria-label="Managed events">
+                {data.events.data.length === 0 && (
+                  <li className="p-4 text-muted-foreground">No upcoming or recent events.</li>
+                )}
+                {data.events.data.map((event) => (
+                  <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
+                    <span>
+                      <span className="font-medium text-brand-navy">{event.title}</span>{" "}
+                      <span className="text-muted-foreground">
+                        ·{" "}
+                        {new Date(event.startsAt).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "Asia/Kolkata",
+                        })}{" "}
+                        · {event.status}
+                      </span>
+                    </span>
+                    <span className="flex gap-3">
+                      <Link href={`/events/${event.id}/manage`} className="underline underline-offset-4">
+                        Manage
+                      </Link>
+                      <Link href={`/events/${event.id}`} className="underline underline-offset-4">
+                        View
+                      </Link>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </TabsContent>
           <TabsContent value="places" className="space-y-4 pt-4">
             <LocationForm />

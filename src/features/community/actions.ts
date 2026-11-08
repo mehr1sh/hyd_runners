@@ -117,7 +117,9 @@ export async function saveEventAction(_prev: FormState, formData: FormData): Pro
   if (!parsed.ok) return { status: "error", message: parsed.message };
   const id = String(formData.get("id") ?? "");
   const saved = await saveEvent(current.supabase, current.user.id, { ...parsed.data, id: id || undefined });
-  return done(saved, id ? "Event updated." : "Event saved.", ["/events", "/manager"]);
+  const paths = ["/events", "/manager"];
+  if (saved.ok) paths.push(`/events/${saved.data.id}`, `/events/${saved.data.id}/manage`);
+  return done(saved, id ? "Event updated." : "Event saved.", paths);
 }
 
 export async function saveLocationUpdateAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -239,7 +241,7 @@ export async function rsvpAction(_prev: RsvpState, formData: FormData): Promise<
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
   const eventId = z.uuid().safeParse(formData.get("eventId"));
-  const status = z.enum(["going", "cancelled"]).safeParse(formData.get("status"));
+  const status = z.enum(["going", "waitlisted", "cancelled"]).safeParse(formData.get("status"));
   if (!eventId.success || !status.success) return { status: "error", message: "Event not found." };
 
   const supabase = await createClient();
@@ -258,11 +260,26 @@ export async function rsvpAction(_prev: RsvpState, formData: FormData): Promise<
   // Badges are awarded with the secret key. Deployments without it (Vercel
   // Preview) still save the RSVP; the badge is awarded on the next workout
   // or RSVP made where the key is configured.
-  if (status.data === "going") await awardRsvpRewards(user.id);
+  // A waiting-list request may have become a place straight away.
+  const { data: saved } = await supabase
+    .from("event_rsvps")
+    .select("status")
+    .eq("event_id", eventId.data)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const finalStatus = (saved?.status as string | undefined) ?? status.data;
+  if (finalStatus === "going") await awardRsvpRewards(user.id);
   revalidatePath("/events");
+  revalidatePath(`/events/${eventId.data}`);
   revalidatePath("/map");
   revalidatePath("/dashboard");
-  return { status: "ok", message: status.data === "going" ? "You're going!" : "RSVP cancelled." };
+  const message =
+    finalStatus === "going"
+      ? "You're going!"
+      : finalStatus === "waitlisted"
+        ? "You're on the waiting list. If a place opens up, it's yours automatically."
+        : "RSVP cancelled.";
+  return { status: "ok", message };
 }
 
 async function awardRsvpRewards(userId: string) {
