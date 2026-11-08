@@ -17,6 +17,7 @@ import {
   saveLocationUpdateAction,
   type FormState,
 } from "../actions";
+import { EVENT_CATEGORY_LABEL } from "@/features/events/logic";
 import { isoToLocalInput } from "../logic/dates";
 
 const idle: FormState = { status: "idle" };
@@ -116,6 +117,9 @@ export function EventForm({
     locationId: string | null;
     capacity: number | null;
     status: string;
+    category?: string;
+    meetingPoint?: string | null;
+    registrationClosesAt?: string | null;
   };
   locations: { id: string; name: string }[];
 }) {
@@ -138,6 +142,33 @@ export function EventForm({
             defaultValue={event?.description}
           />
         </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor={`${idPrefix}-category`}>Category</FieldLabel>
+            <select
+              id={`${idPrefix}-category`}
+              name="category"
+              defaultValue={event?.category ?? "group_run"}
+              className={selectClass}
+            >
+              {Object.entries(EVENT_CATEGORY_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${idPrefix}-meeting`}>Meeting point (optional)</FieldLabel>
+            <Input
+              id={`${idPrefix}-meeting`}
+              name="meetingPoint"
+              maxLength={200}
+              placeholder="e.g. Gate 2, by the water tank"
+              defaultValue={event?.meetingPoint ?? ""}
+            />
+          </Field>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor={`${idPrefix}-start`}>Starts</FieldLabel>
@@ -175,6 +206,15 @@ export function EventForm({
               </option>
             ))}
           </select>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${idPrefix}-closes`}>Registration closes (optional)</FieldLabel>
+          <Input
+            id={`${idPrefix}-closes`}
+            name="registrationClosesAt"
+            type="datetime-local"
+            defaultValue={event?.registrationClosesAt ? isoToLocalInput(event.registrationClosesAt) : ""}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-capacity`}>Capacity</FieldLabel>

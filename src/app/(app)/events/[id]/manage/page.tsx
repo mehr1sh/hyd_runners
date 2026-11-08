@@ -1,0 +1,101 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+import { AccessDenied } from "@/components/shared/access-denied";
+import { PageHeader } from "@/components/shared/page-header";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EventForm } from "@/features/community/components/manager-forms";
+import { listLocations } from "@/features/community/queries";
+import { listPeople } from "@/features/community/service";
+import { getRunnerContext } from "@/features/dashboard/context";
+import { formatDateTime } from "@/features/dashboard/format";
+import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
+import { PaceGroupManager, Roster, TeamList, UpdateComposer } from "@/features/events/components/manage-panels";
+import { getEventDetail, getRoster } from "@/features/events/queries";
+
+export const metadata: Metadata = { title: "Manage event" };
+
+export default async function ManageEventPage({ params }: PageProps<"/events/[id]/manage">) {
+  const { id } = await params;
+  if (!z.uuid().safeParse(id).success) notFound();
+  const ctx = await getRunnerContext();
+  if (!ctx)
+    return (
+      <>
+        <PageHeader title="Manage event" />
+        <RunnerPreviewNotice feature="event management" />
+      </>
+    );
+  const detail = await getEventDetail(ctx.supabase, id, ctx.user.id, ctx.user.roles);
+  if (!detail) notFound();
+  if (!detail.canStaff) return <AccessDenied area="Event management" />;
+
+  const isManager = ctx.user.roles.includes("programme_manager") || ctx.user.roles.includes("admin");
+  const [roster, locations, people] = await Promise.all([
+    getRoster(ctx.supabase, id),
+    detail.canManage ? listLocations() : Promise.resolve([]),
+    isManager ? listPeople(ctx.supabase, ctx.user.id) : Promise.resolve(null),
+  ]);
+  const { event } = detail;
+  const team = detail.team
+    .filter((m): m is typeof m & { user_id: string } => m.user_id !== null)
+    .map((m) => ({ userId: m.user_id, displayName: m.display_name, role: m.role }));
+  const staff = people?.ok ? people.data.staff.map((p) => ({ id: p.id, displayName: p.displayName })) : null;
+
+  return (
+    <>
+      <PageHeader
+        title={`Manage: ${event.title}`}
+        description={`${formatDateTime(event.startsAt, ctx.timezone)}. ${
+          detail.canManage ? "You can edit this event." : "You can check people in."
+        }`}
+      />
+      <p className="mb-4 text-sm">
+        <Link href={`/events/${event.id}`} className="underline underline-offset-4">
+          View the event page
+        </Link>
+      </p>
+      <Tabs defaultValue="roster">
+        <div className="max-w-full overflow-x-auto pb-1">
+          <TabsList>
+            <TabsTrigger value="roster">Roster and check-in</TabsTrigger>
+            {detail.canManage && <TabsTrigger value="details">Details</TabsTrigger>}
+            {detail.canManage && <TabsTrigger value="pace">Pace groups</TabsTrigger>}
+            {detail.canManage && <TabsTrigger value="updates">Updates</TabsTrigger>}
+            <TabsTrigger value="team">Team</TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="roster" className="pt-4">
+          <Roster eventId={event.id} roster={roster} paceGroups={detail.paceGroups} canManage={detail.canManage} />
+        </TabsContent>
+        {detail.canManage && (
+          <TabsContent value="details" className="pt-4">
+            <EventForm event={event} locations={locations} />
+          </TabsContent>
+        )}
+        {detail.canManage && (
+          <TabsContent value="pace" className="pt-4">
+            <PaceGroupManager eventId={event.id} groups={detail.paceGroups} />
+          </TabsContent>
+        )}
+        {detail.canManage && (
+          <TabsContent value="updates" className="space-y-3 pt-4">
+            <UpdateComposer eventId={event.id} />
+            <p className="text-sm text-muted-foreground">
+              {detail.updates.length} update{detail.updates.length === 1 ? "" : "s"} posted so far.
+            </p>
+          </TabsContent>
+        )}
+        <TabsContent value="team" className="pt-4">
+          <TeamList eventId={event.id} team={team} canManage={detail.canManage} staff={staff} />
+          {!isManager && detail.canManage && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Add captains and sweepers from the roster. Programme managers add organisers.
+            </p>
+          )}
+        </TabsContent>
+      </Tabs>
+    </>
+  );
+}
