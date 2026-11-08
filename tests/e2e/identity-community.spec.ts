@@ -242,3 +242,65 @@ test("a runner asks for a coach-led place and their coach approves it", async ({
   await expect(page.getByText("Your request has been sent.")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Start session" })).toBeVisible();
 });
+
+test("a manager revokes a coach, who loses access to their runner but keeps their history", async ({
+  page,
+}, testInfo) => {
+  const admin = adminClient();
+  test.skip(!admin, "Secret key not available to seed staff accounts");
+  if (!admin) return;
+
+  const stamp = `${testInfo.project.name}-${Date.now()}`;
+  const coachName = `Departing ${stamp}`;
+  const runnerName = `Coached ${stamp}`;
+  const note = `Revocation check ${stamp}`;
+  const history = `Earlier coaching note ${stamp}`;
+  const emails = {
+    manager: `e2e-revoker-${stamp}@example.test`,
+    coach: `e2e-departing-${stamp}@example.test`,
+    runner: `e2e-coached-${stamp}@example.test`,
+  };
+  await createUser(admin, emails.manager, `Revoker ${stamp}`, ["programme_manager"]);
+  const coachId = await createUser(admin, emails.coach, coachName, ["coach"]);
+  const runnerId = await createUser(admin, emails.runner, runnerName);
+  const seeded = await Promise.all([
+    admin.from("coach_assignments").insert({ coach_id: coachId, runner_id: runnerId }),
+    admin
+      .from("feedback")
+      .insert({ user_id: runnerId, target: "app", body: note, barrier: "other", assigned_to: coachId }),
+    admin.from("messages").insert({ sender_id: coachId, recipient_id: runnerId, body: history }),
+  ]);
+  for (const { error } of seeded) if (error) throw new Error(`Could not seed: ${error.message}`);
+
+  // Before: the coach sees the assigned feedback.
+  await signInAs(page, emails.coach);
+  await page.goto("/coach");
+  await expect(page.getByRole("listitem").filter({ hasText: note })).toBeVisible();
+
+  // The manager removes the coach role.
+  await signInAs(page, emails.manager);
+  await page.goto("/manager");
+  await page.getByRole("tab", { name: "People" }).click();
+  await expect(page.getByText(`${coachName} → ${runnerName}`)).toBeVisible();
+  const row = page.getByRole("listitem").filter({ hasText: coachName }).filter({ hasText: "coach" });
+  await row.getByRole("button", { name: "Revoke coach" }).click();
+  await expect(page.getByText(`${coachName} → ${runnerName}`)).toHaveCount(0);
+  await page.getByRole("tab", { name: "Feedback" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: note })).not.toContainText(`Assigned to ${coachName}`);
+
+  // After: no coach area, no runner to message, but their own history remains.
+  await signInAs(page, emails.coach);
+  await page.goto("/coach");
+  await expect(page.getByText("The coach area is for staff")).toBeVisible();
+  await page.goto("/community");
+  await page.getByRole("tab", { name: "Messages" }).click();
+  await expect(page.getByText(history)).toBeVisible();
+  await expect(page.getByText(/Nobody is available to message yet/)).toBeVisible();
+
+  // The runner keeps the conversation and cannot write back to the former coach.
+  await signInAs(page, emails.runner);
+  await page.goto("/community");
+  await page.getByRole("tab", { name: "Messages" }).click();
+  await expect(page.getByText(history)).toBeVisible();
+  await expect(page.getByText(/Nobody is available to message yet/)).toBeVisible();
+});

@@ -156,14 +156,16 @@ export async function grantRoleAction(_prev: FormState, formData: FormData): Pro
   return done(saved, "Role granted.", ["/manager", "/coach"]);
 }
 
-export async function revokeRoleAction(formData: FormData) {
+export async function revokeRoleAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const current = await session();
-  if (!current.ok) return;
+  if (!current.ok) return { status: "error", message: current.message };
   const role = String(formData.get("role") ?? "");
   const targetId = String(formData.get("userId") ?? "");
-  if (!assertGrantableRole(role)) return;
-  await revokeStaffRole(current.supabase, current.user.id, targetId, role);
-  revalidatePath("/manager");
+  if (!assertGrantableRole(role)) return { status: "error", message: "You can only remove coach or mentor." };
+  const saved = await revokeStaffRole(current.supabase, current.user.id, targetId, role);
+  // The database also removes their assignments and unassigns their feedback
+  // once they hold no staff role (migration 20261109120000).
+  return done(saved, "Role removed.", ["/manager", "/coach"]);
 }
 
 export async function assignCoachAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -178,11 +180,11 @@ export async function assignCoachAction(_prev: FormState, formData: FormData): P
   return done(saved, "Coach assigned.", ["/manager", "/coach"]);
 }
 
-export async function removeAssignmentAction(formData: FormData) {
+export async function removeAssignmentAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const current = await session();
-  if (!current.ok) return;
-  await removeAssignment(current.supabase, current.user.id, String(formData.get("assignmentId") ?? ""));
-  revalidatePath("/manager");
+  if (!current.ok) return { status: "error", message: current.message };
+  const saved = await removeAssignment(current.supabase, current.user.id, String(formData.get("assignmentId") ?? ""));
+  return done(saved, "Assignment removed.", ["/manager", "/coach"]);
 }
 
 // ---------------------------------------------------------------------------
