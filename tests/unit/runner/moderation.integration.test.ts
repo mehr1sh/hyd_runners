@@ -102,6 +102,11 @@ describe.skipIf(!enabled)("reports, moderation and audit log (local Supabase)", 
   });
 
   afterAll(async () => {
+    // Reports outlive deleted accounts by design; remove this test's own.
+    await admin
+      .from("content_reports")
+      .delete()
+      .in("target_id", [abusiveId, ...burstIds]);
     for (const id of Object.values(ids)) if (id) await admin.auth.admin.deleteUser(id);
   });
 
@@ -127,8 +132,15 @@ describe.skipIf(!enabled)("reports, moderation and audit log (local Supabase)", 
     expect(direct.data).toEqual([]);
     const queue = await listReportQueue(clients.moderator);
     expect(queue.ok).toBe(true);
-    const report = queue.ok ? queue.data.open.find((r) => r.targetId === abusiveId) : undefined;
-    expect(report?.details).toBe("Threatening");
+    // The queue shows the oldest open reports first, so look this one up directly
+    // (other local runs may have left older reports open).
+    const { data: mine } = await clients.moderator
+      .from("content_reports")
+      .select("id, details, status")
+      .eq("target_id", abusiveId)
+      .single();
+    const report = mine as { id: string; details: string; status: string };
+    expect(report).toMatchObject({ details: "Threatening", status: "open" });
     const content = await viewReportedContent(clients.moderator, report!.id);
     expect(content).toMatchObject({ ok: true, data: { body: `abusive ${stamp}`, hidden: false } });
 
