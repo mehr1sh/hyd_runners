@@ -12,6 +12,12 @@ insert into auth.users (id, email, raw_user_meta_data, aud, role) values
 select ok((select count(*) from public.programmes where published) >= 7, 'programme catalogue is seeded');
 select is((select count(*)::int from public.programme_sessions s join public.programmes p on p.id = s.programme_id where p.slug = 'couch-to-5k'), 27, 'Couch to 5K has 27 sessions');
 
+-- The leaderboard is a top-N over everyone's XP, so XP left by local E2E
+-- runs could push the fixture runners out of it. Remove other users' recent
+-- ledger rows inside this transaction (rolled back at the end) so the
+-- leaderboard checks depend only on the fixtures.
+delete from public.xp_ledger where occurred_at > now() - interval '30 days' and user_id::text not like 'aaaaaaaa-0000-4000-8000-%';
+
 -- Server-side (postgres) writes: workouts and ledger for A and B this week, C last week.
 insert into public.workout_logs (id, user_id, status, title, workout_type, started_at, completed_at, duration_seconds, idempotency_key)
 values ('bbbbbbbb-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001', 'completed', 'Run', 'run', now() - interval '1 hour', now() - interval '30 minutes', 1800, gen_random_uuid()),
