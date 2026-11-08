@@ -9,7 +9,23 @@ export type QueryResult = { data: unknown; error: DbError | null };
 export type Query = { table: string; calls: { method: string; args: unknown[] }[] };
 type TableResponse = QueryResult | ((query: Query) => QueryResult);
 
-const CHAIN = ["select", "eq", "neq", "gte", "gt", "lt", "lte", "order", "limit", "in", "not", "like", "or", "is"];
+const CHAIN = [
+  "select",
+  "update",
+  "eq",
+  "neq",
+  "gte",
+  "gt",
+  "lt",
+  "lte",
+  "order",
+  "limit",
+  "in",
+  "not",
+  "like",
+  "or",
+  "is",
+];
 
 export const missingTable = (table: string): QueryResult => ({
   data: null,
