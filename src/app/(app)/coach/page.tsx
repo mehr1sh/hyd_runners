@@ -4,6 +4,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { FeedbackPanel } from "@/features/community/components/feedback-panel";
 import { MessagePanel } from "@/features/community/components/message-panel";
 import { listFeedback, listMessages, listRecipients } from "@/features/community/service";
+import { getUserTimezone } from "@/features/gamification/service";
+import { EnrollmentRequestsPanel } from "@/features/workouts/components/enrollment-requests-panel";
+import { canReviewEnrollments, listEnrollmentRequests } from "@/features/workouts/enrollment-requests";
 import { requireRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,13 +20,16 @@ export default async function CoachPage() {
   if (!user) {
     return (
       <>
-        <PageHeader title="Coach" description="Feedback assigned to you, and messages with your runners." />
+        <PageHeader
+          title="Coach"
+          description="Programme requests, feedback assigned to you, and messages with your runners."
+        />
         <p className="text-sm text-muted-foreground">Sign in with Supabase configured to review assigned feedback.</p>
       </>
     );
   }
 
-  const data = await load(user.id);
+  const data = await load(user.id, canReviewEnrollments(user.roles));
   const isManager = user.roles.includes("programme_manager") || user.roles.includes("admin");
   const visibleFeedback = data.feedback.ok
     ? data.feedback.data.filter((item) => isManager || item.assignedTo === user.id)
@@ -31,8 +37,18 @@ export default async function CoachPage() {
 
   return (
     <>
-      <PageHeader title="Coach" description="Feedback assigned to you, and messages with your runners." />
+      <PageHeader
+        title="Coach"
+        description="Programme requests, feedback assigned to you, and messages with your runners."
+      />
       <div className="space-y-8">
+        {data.requests && (
+          <EnrollmentRequestsPanel
+            requests={data.requests}
+            timezone={data.timezone}
+            scope={isManager ? "all" : "assigned"}
+          />
+        )}
         {visibleFeedback ? (
           <FeedbackPanel items={visibleFeedback} mode="coach" />
         ) : (
@@ -48,12 +64,15 @@ export default async function CoachPage() {
   );
 }
 
-async function load(userId: string) {
+async function load(userId: string, reviewsRequests: boolean) {
   const supabase = await createClient();
-  const [feedback, messages, recipients] = await Promise.all([
+  const [feedback, messages, recipients, requests, timezone] = await Promise.all([
     listFeedback(supabase, userId),
     listMessages(supabase, userId),
     listRecipients(supabase),
+    // Mentors use this page too but do not approve programme places.
+    reviewsRequests ? listEnrollmentRequests(supabase, userId) : null,
+    getUserTimezone(supabase, userId),
   ]);
-  return { feedback, messages, recipients };
+  return { feedback, messages, recipients, requests, timezone };
 }

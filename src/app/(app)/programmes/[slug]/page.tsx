@@ -60,11 +60,20 @@ export default async function ProgrammePage({ params }: PageProps<"/programmes/[
               />
             </div>
           ) : status === "requested" ? (
-            <Alert>
-              <AlertDescription>
-                Your request has been sent. A coach will confirm your place; sessions unlock once you are approved.
-              </AlertDescription>
-            </Alert>
+            <div className="space-y-3">
+              <Alert>
+                <AlertDescription>
+                  Your request has been sent. A coach will confirm your place; sessions unlock once you are approved.
+                </AlertDescription>
+              </Alert>
+              <form action={leaveProgrammeAction}>
+                <input type="hidden" name="enrollmentId" value={enrollment.id} />
+                <input type="hidden" name="status" value="withdrawn" />
+                <Button type="submit" variant="ghost" size="sm">
+                  Cancel request
+                </Button>
+              </form>
+            </div>
           ) : (
             <div className="space-y-4">
               {progress && <ProgressMeter label="Sessions completed" value={progress.completed} max={progress.total} />}

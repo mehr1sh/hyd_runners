@@ -15,6 +15,7 @@ import {
   WorkoutError,
   type StartTarget,
 } from "./service";
+import { canReviewEnrollments, reviewEnrollment } from "./enrollment-requests";
 import { CompletionInput, ManualWorkoutInput } from "./logic/validate";
 
 export type ActionState = { status: "idle" | "error"; message?: string };
@@ -140,13 +141,32 @@ export async function enrollAction(_prev: ActionState, formData: FormData): Prom
   redirect(`/programmes/${slug.data}`);
 }
 
+/** Pause, resume or leave a programme, or cancel a request. The database allows only valid changes. */
 export async function leaveProgrammeAction(formData: FormData) {
   await requireUserId();
   const enrollmentId = z.uuid().safeParse(formData.get("enrollmentId"));
   const status = z.enum(["paused", "withdrawn", "active"]).safeParse(formData.get("status"));
   if (enrollmentId.success && status.success) {
     const supabase = await createClient();
-    await supabase.from("enrollments").update({ status: status.data }).eq("id", enrollmentId.data);
+    const { error } = await supabase.from("enrollments").update({ status: status.data }).eq("id", enrollmentId.data);
+    if (error) console.error(`[enrolments] Could not set ${status.data} (${error.code}): ${error.message}`);
   }
   refresh();
+}
+
+/** Approve or decline a request for a coach-led programme (coaches and programme managers). */
+export async function reviewEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
+  if (!canReviewEnrollments(user.roles))
+    return { status: "error", message: "Only coaches and programme managers can review requests." };
+  const enrollmentId = z.uuid().safeParse(formData.get("enrollmentId"));
+  const decision = z.enum(["approve", "decline"]).safeParse(formData.get("decision"));
+  if (!enrollmentId.success || !decision.success) return { status: "error", message: "Request not found." };
+
+  const result = await reviewEnrollment(await createClient(), enrollmentId.data, decision.data);
+  if (!result.ok) return { status: "error", message: result.message };
+  revalidatePath("/coach");
+  refresh();
+  return { status: "idle" };
 }

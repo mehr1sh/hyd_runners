@@ -198,3 +198,47 @@ test("manager assigns feedback, coach replies and the runner sees it", async ({ 
   await expect(mine).toContainText(reply);
   await expect(mine).toContainText("Acknowledged");
 });
+
+test("a runner asks for a coach-led place and their coach approves it", async ({ page }, testInfo) => {
+  const admin = adminClient();
+  test.skip(!admin, "Secret key not available to seed staff accounts");
+  if (!admin) return;
+
+  const stamp = `${testInfo.project.name}-${Date.now()}`;
+  const runnerName = `Applicant ${stamp}`;
+  const emails = {
+    coach: `e2e-approver-${stamp}@example.test`,
+    runner: `e2e-applicant-${stamp}@example.test`,
+  };
+  const coachId = await createUser(admin, emails.coach, `Approver ${stamp}`, ["coach"]);
+  const runnerId = await createUser(admin, emails.runner, runnerName);
+  const { error } = await admin.from("coach_assignments").insert({ coach_id: coachId, runner_id: runnerId });
+  if (error) throw new Error(`Could not assign the coach: ${error.message}`);
+
+  // Runner asks for a place, changes their mind, then asks again.
+  await signInAs(page, emails.runner);
+  await page.goto("/programmes/training-and-shine");
+  await page.getByRole("button", { name: "Request a place" }).click();
+  await expect(page.getByText("Your request has been sent.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel request" }).click();
+  await expect(page.getByRole("button", { name: "Request a place" })).toBeVisible();
+  await page.getByRole("button", { name: "Request a place" }).click();
+  await expect(page.getByText("Your request has been sent.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start session" })).toHaveCount(0);
+
+  // Their coach approves it.
+  await signInAs(page, emails.coach);
+  await page.goto("/coach");
+  const request = page.getByRole("listitem", { name: `${runnerName}: Training and Shine` });
+  await expect(request).toBeVisible();
+  await expectNoHorizontalScroll(page);
+  await request.getByRole("button", { name: "Approve" }).click();
+  await expect(request).toHaveCount(0);
+  await expect(page.getByText("No requests are waiting.")).toBeVisible();
+
+  // The programme is now open to the runner.
+  await signInAs(page, emails.runner);
+  await page.goto("/programmes/training-and-shine");
+  await expect(page.getByText("Your request has been sent.")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start session" })).toBeVisible();
+});
