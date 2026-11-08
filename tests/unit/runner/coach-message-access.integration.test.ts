@@ -184,7 +184,7 @@ describe.skipIf(!enabled)("coach and message access (local Supabase)", async () 
     expect(sent.error).toBeNull();
     const listed = await listMessages(clients.manager, ids.manager);
     expect(listed.ok).toBe(true);
-    const ours = listed.ok ? listed.data.filter((m) => m.body.includes(String(stamp))) : [];
+    const ours = listed.ok ? listed.data.filter((m) => (m.body ?? "").includes(String(stamp))) : [];
     expect(ours.map((m) => m.body)).toEqual([`manager to other ${stamp}`]);
 
     // The runner who was written to may now reply.

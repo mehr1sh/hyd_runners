@@ -176,7 +176,7 @@ export default async function CommunityPage() {
         </TabsContent>
         <TabsContent value="feedback" className="pt-4">
           {feedback.ok ? (
-            <FeedbackPanel items={feedback.data} mode="runner" />
+            <FeedbackPanel items={feedback.data} mode="runner" viewerId={ctx.user.id} />
           ) : (
             <p className="text-sm text-destructive">{feedback.message}</p>
           )}

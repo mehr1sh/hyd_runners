@@ -8,6 +8,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { replyToFeedbackAction, submitFeedbackAction, updateFeedbackAction, type FormState } from "../actions";
 import { BARRIER_LABEL, STATUS_LABEL } from "../logic/feedback";
+import { ReportForm } from "./report-form";
 
 const idle: FormState = { status: "idle" };
 const selectClass =
@@ -24,7 +25,16 @@ export type FeedbackItem = {
   authorName: string;
   assigneeName: string | null;
   assignedTo: string | null;
-  replies: { id: string; authorName: string; body: string; createdAt: string }[];
+  reported: boolean;
+  replies: {
+    id: string;
+    authorId: string;
+    authorName: string;
+    body: string | null;
+    hidden: boolean;
+    reported: boolean;
+    createdAt: string;
+  }[];
 };
 
 const when = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
@@ -32,10 +42,12 @@ const when = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: 
 export function FeedbackPanel({
   items,
   mode,
+  viewerId,
   staff = [],
 }: {
   items: FeedbackItem[];
   mode: "runner" | "coach" | "manager";
+  viewerId: string;
   staff?: { id: string; displayName: string }[];
 }) {
   return (
@@ -64,13 +76,23 @@ export function FeedbackPanel({
                   {item.replies.map((reply) => (
                     <li key={reply.id} className="text-sm">
                       <p className="font-medium text-brand-navy">{reply.authorName}</p>
-                      <p>{reply.body}</p>
+                      {reply.hidden ? (
+                        <p className="text-muted-foreground italic">This reply was removed by a moderator.</p>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{reply.body}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         <time dateTime={reply.createdAt}>{when.format(new Date(reply.createdAt))}</time>
                       </p>
+                      {reply.authorId !== viewerId && !reply.hidden && (
+                        <ReportForm targetType="feedback_reply" targetId={reply.id} alreadyReported={reply.reported} />
+                      )}
                     </li>
                   ))}
                 </ul>
+              )}
+              {mode === "coach" && item.userId !== viewerId && (
+                <ReportForm targetType="feedback" targetId={item.id} alreadyReported={item.reported} />
               )}
               <ReplyForm feedbackId={item.id} />
               {mode === "manager" && <AssignForm item={item} staff={staff} />}

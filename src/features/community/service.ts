@@ -2,10 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Role } from "@/lib/contracts";
 import { CommunityEvent, Location } from "@/lib/contracts";
 import { dbFailure, type ServiceResult } from "@/features/shared/db";
+import { isMissingSchemaError } from "@/lib/supabase/errors";
 import { canManageCommunity, hasAnyRole, MANAGER_ROLES } from "./logic/access";
 import { AnnouncementView, LocationUpdate, type DirectMessage } from "./logic/content";
 import { isUnread } from "./logic/dates";
 import { ParticipationFeedback, barrierToTarget, type FeedbackDraft } from "./logic/feedback";
+import { reportedTargetIds } from "./moderation";
 
 function iso(value: string) {
   return new Date(value).toISOString();
@@ -45,24 +47,56 @@ export async function submitFeedback(supabase: SupabaseClient, userId: string, i
   return { ok: true as const, data: mapFeedback(data) };
 }
 
+type ReplyRow = {
+  id: string;
+  feedback_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  hidden_at?: string | null;
+};
+type MessageRow = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  created_at: string;
+  hidden_at?: string | null;
+};
+
+async function readReplies(supabase: SupabaseClient, feedbackIds: string[]) {
+  const read = (columns: string) =>
+    supabase
+      .from("feedback_replies")
+      .select(columns)
+      .in("feedback_id", feedbackIds)
+      .order("created_at", { ascending: true });
+  let result = await read("id, feedback_id, author_id, body, created_at, hidden_at");
+  // hidden_at arrives with the moderation migration; read without it until then.
+  if (result.error && isMissingSchemaError(result.error))
+    result = await read("id, feedback_id, author_id, body, created_at");
+  return { data: (result.data ?? []) as unknown as ReplyRow[], error: result.error };
+}
+
 export async function listFeedback(supabase: SupabaseClient, userId: string) {
   const { data, error } = await supabase.from("feedback").select("*").order("created_at", { ascending: false });
   if (error) return dbFailure(error, "Could not load feedback.");
   const rows = data ?? [];
   const ids = rows.map((row) => row.id as string);
-  const replies = ids.length
-    ? await supabase
-        .from("feedback_replies")
-        .select("id, feedback_id, author_id, body, created_at")
-        .in("feedback_id", ids)
-        .order("created_at", { ascending: true })
-    : { data: [], error: null };
+  const replies = ids.length ? await readReplies(supabase, ids) : { data: [] as ReplyRow[], error: null };
   if (replies.error) return dbFailure(replies.error, "Could not load replies.");
 
   const names = await displayNames(supabase, [
     ...rows.flatMap((row) => [row.user_id, row.assigned_to].filter(Boolean)),
     ...(replies.data ?? []).map((row) => row.author_id),
   ] as string[]);
+  const reportedReplies = await reportedTargetIds(
+    supabase,
+    userId,
+    "feedback_reply",
+    (replies.data ?? []).map((reply) => reply.id as string),
+  );
+  const reportedFeedback = await reportedTargetIds(supabase, userId, "feedback", ids);
 
   return {
     ok: true as const,
@@ -70,13 +104,17 @@ export async function listFeedback(supabase: SupabaseClient, userId: string) {
       ...mapFeedback(row),
       authorName: names.get(row.user_id) ?? "Runner",
       assigneeName: row.assigned_to ? (names.get(row.assigned_to) ?? "Staff") : null,
+      reported: reportedFeedback.has(row.id as string),
       replies: (replies.data ?? [])
         .filter((reply) => reply.feedback_id === row.id)
         .map((reply) => ({
           id: reply.id as string,
           authorId: reply.author_id as string,
           authorName: names.get(reply.author_id) ?? "Member",
-          body: reply.body as string,
+          // Hidden by a moderator: the text is not sent to the browser.
+          body: reply.hidden_at ? null : (reply.body as string),
+          hidden: Boolean(reply.hidden_at),
+          reported: reportedReplies.has(reply.id as string),
           createdAt: iso(reply.created_at),
         })),
     })),
@@ -376,20 +414,27 @@ export async function saveEvent(
 }
 
 export async function listMessages(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("id, sender_id, recipient_id, body, created_at")
-    .order("created_at", { ascending: true });
+  const read = (columns: string) => supabase.from("messages").select(columns).order("created_at", { ascending: true });
+  let { data, error } = await read("id, sender_id, recipient_id, body, created_at, hidden_at");
+  // hidden_at arrives with the moderation migration; read without it until then.
+  if (error && isMissingSchemaError(error))
+    ({ data, error } = await read("id, sender_id, recipient_id, body, created_at"));
   if (error) return dbFailure(error, "Could not load messages.");
-  const rows = (data ?? []).map(
-    (row) =>
-      ({
-        id: row.id,
-        senderId: row.sender_id,
-        recipientId: row.recipient_id,
-        body: row.body,
-        createdAt: iso(row.created_at),
-      }) satisfies DirectMessage,
+  const rows = ((data ?? []) as unknown as MessageRow[]).map((row) => ({
+    ...({
+      id: row.id,
+      senderId: row.sender_id,
+      recipientId: row.recipient_id,
+      body: row.body,
+      createdAt: iso(row.created_at),
+    } satisfies DirectMessage),
+    hidden: Boolean(row.hidden_at),
+  }));
+  const reported = await reportedTargetIds(
+    supabase,
+    userId,
+    "message",
+    rows.filter((row) => row.recipientId === userId).map((row) => row.id),
   );
   const names = await displayNames(
     supabase,
@@ -399,6 +444,9 @@ export async function listMessages(supabase: SupabaseClient, userId: string) {
     ok: true as const,
     data: rows.map((row) => ({
       ...row,
+      // Hidden by a moderator: the text is not sent to the browser.
+      body: row.hidden ? null : row.body,
+      reported: reported.has(row.id),
       senderName: names.get(row.senderId) ?? "Member",
       recipientName: names.get(row.recipientId) ?? "Member",
     })),
