@@ -14,7 +14,8 @@
 --   reviewer:          requested -> active | withdrawn   (never their own)
 -- A reviewer is a programme manager or admin, or a user who currently holds
 -- the coach role and is assigned to the runner. Completion stays server-side
--- (secret key).
+-- (secret key). Only status can be changed through the API; the database
+-- sets coach_id and started_at on approval.
 
 -- Who may review (read and decide) a runner's enrolments.
 create function private.can_review_enrollment(runner uuid)
@@ -58,6 +59,14 @@ begin
   if current_user in ('service_role', 'postgres') then
     return new;
   end if;
+  -- Only status may change through the API. Column grants already enforce
+  -- this; checking here as well keeps it true if grants are ever widened.
+  -- (Approval sets coach_id and started_at below, after this check.)
+  if (new.id, new.user_id, new.programme_id, new.coach_id, new.started_at, new.completed_at, new.created_at)
+     is distinct from
+     (old.id, old.user_id, old.programme_id, old.coach_id, old.started_at, old.completed_at, old.created_at) then
+    raise exception 'only the enrolment status can be changed' using errcode = '42501';
+  end if;
   if new.status = old.status then
     return new;
   end if;
@@ -90,6 +99,13 @@ $$;
 -- but its value is ignored). coach_id is set only on approval.
 revoke insert on public.enrollments from authenticated;
 grant insert (user_id, programme_id, status) on public.enrollments to authenticated;
+
+-- Updates through the API change status only (20261015100000 already granted
+-- just this column; restated so a drifted database is corrected). Revoking
+-- the table privilege also removes any column grants, then status is
+-- granted again. Server-side completion uses the service role.
+revoke update on public.enrollments from authenticated;
+grant update (status) on public.enrollments to authenticated;
 
 -- Staff no longer read every enrolment: reviewers read the runners they review.
 drop policy "enrollments: staff read" on public.enrollments;

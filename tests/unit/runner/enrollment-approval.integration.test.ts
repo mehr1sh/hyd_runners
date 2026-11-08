@@ -119,6 +119,29 @@ describe.skipIf(!enabled)("coach-led enrolment approval (local Supabase)", async
       .insert({ user_id: ids.runner, programme_id: programmeId, coach_id: ids.runner });
     expect(forged.error?.code).toBe("42501");
     expect(await statusOf(own!.id)).toBe("requested");
+
+    // Only status is writable: other fields are refused, with or without a status change.
+    for (const change of [
+      { coach_id: ids.coach },
+      { started_at: new Date(Date.now() - 30 * 86_400_000).toISOString() },
+      { user_id: ids.coach },
+      { status: "withdrawn", completed_at: new Date().toISOString() },
+    ]) {
+      const { error } = await runner.from("enrollments").update(change).eq("id", own!.id);
+      expect(error?.code, JSON.stringify(change)).toBe("42501");
+    }
+    const { data: unchanged } = await admin
+      .from("enrollments")
+      .select("user_id, coach_id, started_at, completed_at, status")
+      .eq("id", own!.id)
+      .single();
+    expect(unchanged).toEqual({
+      user_id: ids.runner,
+      coach_id: null,
+      started_at: null,
+      completed_at: null,
+      status: "requested",
+    });
   });
 
   it("lets only the current assigned coach approve it", async () => {
@@ -137,6 +160,13 @@ describe.skipIf(!enabled)("coach-led enrolment approval (local Supabase)", async
     expect(await statusOf(own!.id)).toBe("requested");
 
     const coach = await signIn(email("coach"));
+    // The coach cannot set the approval fields themselves.
+    const backdated = await coach
+      .from("enrollments")
+      .update({ status: "active", started_at: new Date(Date.now() - 30 * 86_400_000).toISOString() })
+      .eq("id", own!.id);
+    expect(backdated.error?.code).toBe("42501");
+    expect(await statusOf(own!.id)).toBe("requested");
     const requests = await listEnrollmentRequests(coach, ids.coach);
     expect(requests).toEqual([
       expect.objectContaining({
