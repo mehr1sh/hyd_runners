@@ -411,6 +411,7 @@ export async function saveEvent(
     category: string;
     meetingPoint: string | null;
     registrationClosesAt: string | null;
+    clubId?: string | null;
   },
 ) {
   const row = {
@@ -432,11 +433,14 @@ export async function saveEvent(
     if (count === 0) return { ok: false as const, code: "forbidden" as const, message: "You can't edit that event." };
     return { ok: true as const, data: { id: input.id } };
   }
-  const manager = await requireManager(supabase, userId);
-  if (!manager.ok) return manager;
+  // Managers create any event; club admins create events for their own club (RLS).
+  if (!input.clubId) {
+    const manager = await requireManager(supabase, userId);
+    if (!manager.ok) return manager;
+  }
   const { data, error } = await supabase
     .from("events")
-    .insert({ ...row, created_by: userId })
+    .insert({ ...row, created_by: userId, club_id: input.clubId ?? null })
     .select("id")
     .single();
   if (error) return dbFailure(error, "Could not save that event.");

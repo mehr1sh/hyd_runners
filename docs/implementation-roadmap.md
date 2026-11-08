@@ -20,13 +20,13 @@ Release 1 is sequenced in this order:
 4. **Routes v1** need PostGIS. Events and group runs then link to routes.
 5. **Navigation** is redesigned last, once the Explore, Community and Events pages exist.
 
-| Workstream                              | Status      | PR  | Migration | Notes                                                                   |
-| --------------------------------------- | ----------- | --- | --------- | ----------------------------------------------------------------------- |
-| A. Events v2                            | Not started |     |           |                                                                         |
-| B. Clubs                                | Not started |     |           |                                                                         |
-| C. Group runs and pace pods             | Not started |     |           |                                                                         |
-| D. Routes v1 and Hyderabad Run Explorer | Not started |     |           | Routes come only from verified GPX uploads or traced OpenStreetMap ways |
-| E. Navigation redesign                  | Not started |     |           | Today, Train, Explore, Community, Events, Profile                       |
+| Workstream                              | Status                                   | PR            | Migration                  | Notes                                                                                                                                                                                                       |
+| --------------------------------------- | ---------------------------------------- | ------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Events v2                            | Production verified (schema), 2026-11-08 | #15 `3e80c77` | `20261110120000_events_v2` | Event teams, waiting lists, check-in, pace groups, announcements, private results, calendar export, past events. Route maps come with Routes v1. Dry run 42501025649, apply 42501096425, verify 42501161486 |
+| B. Clubs                                | Not started                              |               |                            |                                                                                                                                                                                                             |
+| C. Group runs and pace pods             | Not started                              |               |                            |                                                                                                                                                                                                             |
+| D. Routes v1 and Hyderabad Run Explorer | Not started                              |               |                            | Routes come only from verified GPX uploads or traced OpenStreetMap ways                                                                                                                                     |
+| E. Navigation redesign                  | Not started                              |               |                            | Today, Train, Explore, Community, Events, Profile                                                                                                                                                           |
 
 ## Release 2: activity intelligence and engagement
 

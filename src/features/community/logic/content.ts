@@ -131,7 +131,10 @@ export function parseEventForm(formData: FormData) {
   if (extras.data.registrationClosesAt && extras.data.registrationClosesAt > parsed.data.endsAt) {
     return { ok: false as const, message: "Registration must close before the event ends." };
   }
-  return { ok: true as const, data: { ...parsed.data, ...extras.data } };
+  const clubRaw = String(formData.get("clubId") ?? "");
+  const clubId = clubRaw === "" ? null : z.uuid().safeParse(clubRaw);
+  if (clubId !== null && !clubId.success) return { ok: false as const, message: "Club not found." };
+  return { ok: true as const, data: { ...parsed.data, ...extras.data, clubId: clubId?.data ?? null } };
 }
 
 export function parseMessageForm(formData: FormData) {
