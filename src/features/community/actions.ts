@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { reconcileRewards } from "@/features/gamification/service";
+import { PrivilegedAccessUnavailableError } from "@/lib/supabase/admin";
 import { assertGrantableRole } from "./logic/access";
 import {
   parseAnnouncementForm,
@@ -249,14 +250,29 @@ export async function rsvpAction(_prev: RsvpState, formData: FormData): Promise<
     if (error.message.includes("full")) return { status: "error", message: "Sorry, this event is full." };
     if (error.message.includes("not open"))
       return { status: "error", message: "This event is no longer taking sign-ups." };
+    if (error.code === "PT429")
+      return { status: "error", message: "You've changed your RSVP a lot. Please wait a few minutes and try again." };
     console.error(error);
     return { status: "error", message: "Could not update your RSVP." };
   }
-  if (status.data === "going") await reconcileRewards(user.id);
+  // Badges are awarded with the secret key. Deployments without it (Vercel
+  // Preview) still save the RSVP; the badge is awarded on the next workout
+  // or RSVP made where the key is configured.
+  if (status.data === "going") await awardRsvpRewards(user.id);
   revalidatePath("/events");
   revalidatePath("/map");
   revalidatePath("/dashboard");
   return { status: "ok", message: status.data === "going" ? "You're going!" : "RSVP cancelled." };
+}
+
+async function awardRsvpRewards(userId: string) {
+  try {
+    await reconcileRewards(userId);
+  } catch (error) {
+    if (error instanceof PrivilegedAccessUnavailableError) return;
+    // The RSVP itself is saved; a reward failure must not undo or hide that.
+    console.error("[rsvp] could not reconcile rewards", error instanceof Error ? error.name : error);
+  }
 }
 
 export async function setLeaderboardVisibilityAction(formData: FormData) {

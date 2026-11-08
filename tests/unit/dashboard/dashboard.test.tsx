@@ -177,6 +177,27 @@ describe("loadDashboardState", () => {
     await expect(failure).rejects.toMatchObject({ code: "57014", source: "workout_logs" });
   });
 
+  it("shows the not-available notice when a new database function is not deployed yet", async () => {
+    client = fakeSupabase({
+      "rpc:my_reward_totals": {
+        data: null,
+        error: { message: "Could not find the function public.my_reward_totals", code: "PGRST202" },
+      },
+    });
+    await expect(loadDashboardState(makeCtx(client))).resolves.toMatchObject({ status: "schema_missing" });
+  });
+
+  it("uses database totals and a database count, not the rows the API returns", async () => {
+    client = fakeSupabase({
+      ...completeRunnerTables(),
+      "rpc:my_reward_totals": { data: [{ total_xp: 12345, total_coins: 678, ledger_rows: 4000 }], error: null },
+    });
+    const state = await loadDashboardState(makeCtx(client));
+    if (state.status !== "ready") throw new Error(state.status);
+    expect(state.data.game.summary.totalXp).toBe(12345);
+    expect(state.data.game.summary.coins).toBe(678);
+  });
+
   it("treats a missing scheduler table as no planned workouts, not a failure", async () => {
     client = fakeSupabase({ scheduled_workouts: missingTable("scheduled_workouts") });
     expect((await loadDashboardState(makeCtx(client))).status).toBe("ready");

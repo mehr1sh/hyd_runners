@@ -156,6 +156,9 @@ test("manager assigns feedback, coach replies and the runner sees it", async ({ 
   await expectNoHorizontalScroll(page);
 
   await page.getByRole("tab", { name: "People" }).click();
+  // People are paged; search narrows the runner list to this test's runner.
+  await page.getByLabel("Find people by name").fill(runnerName);
+  await page.getByRole("button", { name: "Search" }).click();
   await page.getByLabel("Coach or mentor").selectOption({ label: coachName });
   await page.getByLabel(/^Runner/).selectOption({ label: runnerName });
   await page.getByRole("button", { name: "Assign", exact: true }).click();
@@ -279,8 +282,7 @@ test("a manager revokes a coach, who loses access to their runner but keeps thei
 
   // The manager removes the coach role.
   await signInAs(page, emails.manager);
-  await page.goto("/manager");
-  await page.getByRole("tab", { name: "People" }).click();
+  await page.goto(`/manager?tab=people&people=${encodeURIComponent(coachName)}`);
   await expect(page.getByText(`${coachName} → ${runnerName}`)).toBeVisible();
   const row = page.getByRole("listitem").filter({ hasText: coachName }).filter({ hasText: "coach" });
   await row.getByRole("button", { name: "Revoke coach" }).click();
