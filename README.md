@@ -66,7 +66,13 @@ cp .env.example .env.local
 | `GEMINI_API_KEY`, `GEMINI_MODEL`                                                          | Only when `AI_PROVIDER=gemini`                                                                |
 | `AI_DAILY_CALL_LIMIT`                                                                     | AI calls per user per day (default `10`)                                                      |
 | `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_ATTRIBUTION`                                 | Map tiles; defaults to OpenStreetMap (light use only). Use a commercial provider for real use |
-| `DEMO_SEED_TOKEN`                                                                         | Optional; enables `POST /api/v1/dev/seed-demo` in production. Leave empty                     |
+| `DEMO_SEED_ENABLED`, `DEMO_SEED_TOKEN`                                                    | Optional, local only; see below. Leave empty                                                  |
+
+**Demo seed.** `POST /api/v1/dev/seed-demo` creates or resets the labelled demo accounts (`demo.runner@hydrunners.test` and three sample runners). It is off unless `DEMO_SEED_ENABLED=true` and `DEMO_SEED_TOKEN` is at least 32 characters, and it always answers 404 on Vercel Production and Preview. Each run generates a new random password for the demo runner and returns it once in the response:
+
+```bash
+curl -X POST -H "Authorization: Bearer $DEMO_SEED_TOKEN" http://localhost:3000/api/v1/dev/seed-demo
+```
 
 Without Supabase variables the app runs in _preview mode_: every screen renders, sign-in and data are disabled. `NEXT_PUBLIC_*` values are compiled in at build time, so restart or rebuild after changing them.
 
@@ -126,7 +132,8 @@ Vercel Production (branch `main`) and Preview (every other branch and PR) use th
 | ------------------------------------------------------------------ | ---------- | -------- |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes        | yes      |
 | `NEXT_PUBLIC_SITE_URL` = `https://hydrunners.vercel.app`           | yes        | yes      |
-| `SUPABASE_SECRET_KEY`, `DEMO_SEED_TOKEN`                           | yes        | **no**   |
+| `SUPABASE_SECRET_KEY`                                              | yes        | **no**   |
+| `DEMO_SEED_ENABLED`, `DEMO_SEED_TOKEN`                             | **no**     | **no**   |
 | AI and map variables                                               | yes        | optional |
 
 On a Preview deployment, RLS applies to everything, sign-up is turned off, the demo seed is disabled and saving workouts (which needs the secret key) shows "not available on this deployment". Sign in with a dedicated test account that has only the `runner` role; never give test accounts staff roles, since staff actions such as announcements and events are visible in production. Previews never run migrations, and a branch that adds a migration previews against the current schema.

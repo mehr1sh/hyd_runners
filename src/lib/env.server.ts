@@ -21,6 +21,25 @@ const ServerEnv = z.object({
  */
 export const isPreviewDeployment = process.env.VERCEL_ENV === "preview";
 
+export const DEMO_SEED_TOKEN_MIN_LENGTH = 32;
+
+export type DemoSeedConfig = { enabled: true; token: string } | { enabled: false };
+
+/**
+ * POST /api/v1/dev/seed-demo fails closed. It is on only when
+ * `DEMO_SEED_ENABLED=true` and `DEMO_SEED_TOKEN` holds at least
+ * DEMO_SEED_TOKEN_MIN_LENGTH characters, and never on a Vercel Production or
+ * Preview deployment (both use the shared production database), whatever the
+ * variables say. Read per call so it always reflects the current environment.
+ */
+export function demoSeedConfig(env: NodeJS.ProcessEnv = process.env): DemoSeedConfig {
+  if (env.VERCEL_ENV === "production" || env.VERCEL_ENV === "preview") return { enabled: false };
+  if (env.DEMO_SEED_ENABLED !== "true") return { enabled: false };
+  const token = env.DEMO_SEED_TOKEN?.trim() ?? "";
+  if (token.length < DEMO_SEED_TOKEN_MIN_LENGTH) return { enabled: false };
+  return { enabled: true, token };
+}
+
 export const serverEnv = ServerEnv.parse({
   SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY || undefined,
   AI_PROVIDER: process.env.AI_PROVIDER || undefined,
