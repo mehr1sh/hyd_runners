@@ -56,9 +56,19 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           supabase db diff --linked --schema public,private > drift.sql
-          if grep -Eiq '^\s*(create|alter|drop|grant|revoke|comment)\b' drift.sql; then
+          # Objects Supabase manages outside our migrations, allowed by exact name:
+          # public.rls_auto_enable() is the event-trigger function behind the
+          # dashboard's "automatically enable RLS on new tables" setting.
+          python3 - <<'PY'
+          import re
+          sql = open("drift.sql").read()
+          sql = re.sub(r"CREATE OR REPLACE FUNCTION public\.rls_auto_enable\(\).*?\$function\$;", "", sql, flags=re.S)
+          sql = "\n".join(l for l in sql.splitlines() if "rls_auto_enable" not in l)
+          open("drift-filtered.sql", "w").write(sql)
+          PY
+          if grep -Eiq '^\s*(create|alter|drop|grant|revoke|comment)\b' drift-filtered.sql; then
             echo "::error::Production schema differs from supabase/migrations:"
-            cat drift.sql
+            cat drift-filtered.sql
             exit 1
           fi
           echo "No drift: production public/private schema matches the migrations applied."
