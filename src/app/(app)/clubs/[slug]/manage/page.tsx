@@ -20,6 +20,7 @@ import { getRunnerContext } from "@/features/dashboard/context";
 import { formatDateTime } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { weekStart } from "@/features/gamification/logic/time";
+import { SeriesForm } from "@/features/group-runs/components/series-forms";
 import { publicEnv } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Manage club" };
@@ -66,6 +67,7 @@ export default async function ManageClubPage({ params }: PageProps<"/clubs/[slug
             <TabsTrigger value="members">Members{pending.length ? ` (${pending.length} waiting)` : ""}</TabsTrigger>
             <TabsTrigger value="announcements">Announcements</TabsTrigger>
             {page.canAdmin && <TabsTrigger value="events">Club runs</TabsTrigger>}
+            {page.canAdmin && <TabsTrigger value="series">Weekly runs</TabsTrigger>}
             {page.canAdmin && <TabsTrigger value="invites">Invites</TabsTrigger>}
             {page.canAdmin && <TabsTrigger value="details">Details</TabsTrigger>}
           </TabsList>
@@ -132,6 +134,15 @@ export default async function ManageClubPage({ params }: PageProps<"/clubs/[slug
               run&apos;s page.
             </p>
             <EventForm locations={locations} clubId={club.id} />
+          </TabsContent>
+        )}
+        {page.canAdmin && (
+          <TabsContent value="series" className="space-y-2 pt-4">
+            <p className="text-sm text-muted-foreground">
+              A weekly run schedules itself four weeks ahead, with pace groups and a no-drop promise. Manage it from its
+              page under Group runs.
+            </p>
+            <SeriesForm clubId={club.id} locations={locations} />
           </TabsContent>
         )}
         {page.canAdmin && (
