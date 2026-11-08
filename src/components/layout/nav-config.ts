@@ -1,15 +1,9 @@
 import {
-  Activity,
-  CalendarDays,
-  ChartColumn,
   CircleUserRound,
+  Compass,
   ClipboardList,
   Dumbbell,
-  Flag,
   LayoutDashboard,
-  MapPin,
-  Repeat,
-  Route,
   CalendarCheck,
   ShieldCheck,
   Users,
@@ -25,22 +19,64 @@ export type NavItem = {
   mobilePrimary?: boolean;
   /** Visible only to these roles. Omit for every signed-in user. */
   roles?: readonly Role[];
+  /** Other paths that belong to this section (keeps the section highlighted). */
+  match?: readonly string[];
 };
 
+/** The six sections of the app. Existing pages keep their URLs. */
 export const RUNNER_NAV: NavItem[] = [
   { href: "/dashboard", label: "Today", icon: LayoutDashboard, mobilePrimary: true },
-  { href: "/schedule", label: "Schedule", icon: CalendarDays, mobilePrimary: true },
-  { href: "/programmes", label: "Programmes", icon: Dumbbell, mobilePrimary: true },
-  { href: "/workouts", label: "Workouts", icon: Activity, mobilePrimary: true },
-  { href: "/reports", label: "Reports", icon: ChartColumn },
-  { href: "/community", label: "Community", icon: Users },
+  {
+    href: "/train",
+    label: "Train",
+    icon: Dumbbell,
+    mobilePrimary: true,
+    match: ["/schedule", "/programmes", "/workouts", "/reports"],
+  },
+  { href: "/explore", label: "Explore", icon: Compass, mobilePrimary: true, match: ["/routes", "/runs", "/map"] },
+  { href: "/community", label: "Community", icon: Users, mobilePrimary: true, match: ["/clubs"] },
   { href: "/events", label: "Events", icon: CalendarCheck },
-  { href: "/runs", label: "Group runs", icon: Repeat },
-  { href: "/routes", label: "Routes", icon: Route },
-  { href: "/clubs", label: "Clubs", icon: Flag },
-  { href: "/map", label: "Map", icon: MapPin },
   { href: "/profile", label: "Profile", icon: CircleUserRound },
 ];
+
+/** Sub-pages shown as tabs inside a section. */
+export const SECTION_TABS: { section: string; tabs: { href: string; label: string }[] }[] = [
+  {
+    section: "/train",
+    tabs: [
+      { href: "/train", label: "Overview" },
+      { href: "/schedule", label: "Schedule" },
+      { href: "/programmes", label: "Programmes" },
+      { href: "/workouts", label: "Workouts" },
+      { href: "/reports", label: "Reports" },
+    ],
+  },
+  {
+    section: "/explore",
+    tabs: [
+      { href: "/explore", label: "Overview" },
+      { href: "/routes", label: "Routes" },
+      { href: "/runs", label: "Group runs" },
+      { href: "/map", label: "Places" },
+    ],
+  },
+  {
+    section: "/community",
+    tabs: [
+      { href: "/community", label: "Community" },
+      { href: "/clubs", label: "Clubs" },
+    ],
+  },
+];
+
+export function isActiveItem(pathname: string, item: NavItem) {
+  return isActivePath(pathname, item.href) || (item.match ?? []).some((href) => isActivePath(pathname, href));
+}
+
+/** The tabs for the section the current page belongs to, if any. */
+export function sectionTabsFor(pathname: string) {
+  return SECTION_TABS.find((s) => s.tabs.some((t) => isActivePath(pathname, t.href)))?.tabs ?? null;
+}
 
 export const STAFF_NAV: NavItem[] = [
   { href: "/coach", label: "Coach", icon: ClipboardList, roles: ["coach", "mentor", "programme_manager", "admin"] },

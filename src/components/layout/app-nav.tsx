@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Ellipsis } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { RUNNER_NAV, STAFF_NAV, isActivePath, type NavItem } from "./nav-config";
+import { RUNNER_NAV, STAFF_NAV, isActiveItem, sectionTabsFor, type NavItem } from "./nav-config";
 
 const staffFor = (hrefs: string[]) => STAFF_NAV.filter((item) => hrefs.includes(item.href));
 
@@ -15,7 +15,7 @@ function SidebarLink({
   pathname,
   ...rest
 }: { item: NavItem; pathname: string } & Omit<React.ComponentProps<typeof Link>, "href">) {
-  const active = isActivePath(pathname, item.href);
+  const active = isActiveItem(pathname, item);
   const Icon = item.icon;
   return (
     <Link
@@ -69,7 +69,7 @@ export function MobileTabBar({ staffHrefs }: { staffHrefs: string[] }) {
   const staffItems = staffFor(staffHrefs);
   const primary = RUNNER_NAV.filter((i) => i.mobilePrimary);
   const secondary = [...RUNNER_NAV.filter((i) => !i.mobilePrimary), ...staffItems];
-  const moreActive = secondary.some((i) => isActivePath(pathname, i.href));
+  const moreActive = secondary.some((i) => isActiveItem(pathname, i));
 
   const tabClass = (active: boolean) =>
     cn(
@@ -84,7 +84,7 @@ export function MobileTabBar({ staffHrefs }: { staffHrefs: string[] }) {
     >
       <ul className="flex">
         {primary.map((item) => {
-          const active = isActivePath(pathname, item.href);
+          const active = isActiveItem(pathname, item);
           const Icon = item.icon;
           return (
             <li key={item.href} className="flex flex-1">
@@ -117,6 +117,36 @@ export function MobileTabBar({ staffHrefs }: { staffHrefs: string[] }) {
             </SheetContent>
           </Sheet>
         </li>
+      </ul>
+    </nav>
+  );
+}
+
+/** Tabs for the pages inside the current section (Train, Explore, Community). */
+export function SectionTabs() {
+  const pathname = usePathname();
+  const tabs = sectionTabsFor(pathname);
+  if (!tabs) return null;
+  return (
+    <nav aria-label="Section" className="mb-6 max-w-full overflow-x-auto">
+      <ul className="flex gap-1 border-b">
+        {tabs.map((tab) => {
+          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          return (
+            <li key={tab.href}>
+              <Link
+                href={tab.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "-mb-px inline-flex min-h-10 items-center border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted-foreground hover:text-foreground",
+                  active && "border-brand-red text-brand-navy",
+                )}
+              >
+                {tab.label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

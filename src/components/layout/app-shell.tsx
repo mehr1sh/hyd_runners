@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/logo";
 import { SetupNotice } from "@/components/shared/setup-notice";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { MobileTabBar, SidebarNav } from "./app-nav";
+import { MobileTabBar, SectionTabs, SidebarNav } from "./app-nav";
 import { visibleStaffNav } from "./nav-config";
 import { UserMenu } from "./user-menu";
 
@@ -31,6 +31,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           <SidebarNav staffHrefs={staffHrefs} />
         </aside>
         <main id="main" className="min-w-0 flex-1 pt-6 pb-28 sm:pt-8 lg:pb-12">
+          <SectionTabs />
           {children}
         </main>
       </div>

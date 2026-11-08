@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PostgrestError } from "@supabase/supabase-js";
 import type { ErrorCode } from "@/lib/contracts";
 
@@ -45,4 +46,27 @@ export async function fetchAllPages<T>(
     rows.push(...(data ?? []));
     if ((data ?? []).length < size) return rows;
   }
+}
+
+/**
+ * Display names for profile ids the caller may read (RLS decides), fetched in
+ * batches of 100 so a long list never produces an over-long request URL.
+ * Failures are logged; unknown ids are simply absent from the map.
+ */
+export async function profileNames(
+  supabase: SupabaseClient,
+  ids: (string | null | undefined)[],
+  context = "profiles",
+): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  const names = new Map<string, string>();
+  for (let i = 0; i < unique.length; i += 100) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", unique.slice(i, i + 100));
+    if (error) console.error(`[${context}] could not load names`, error.code);
+    for (const row of (data ?? []) as { id: string; display_name: string }[]) names.set(row.id, row.display_name);
+  }
+  return names;
 }

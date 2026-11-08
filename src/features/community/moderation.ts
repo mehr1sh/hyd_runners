@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ServiceResult } from "@/features/shared/db";
+import { profileNames, type ServiceResult } from "@/features/shared/db";
 import {
   moderationErrorMessage,
   type ReportDecision,
@@ -74,14 +74,8 @@ function failure(error: { code?: string; message?: string }, fallback: string): 
   return { ok: false, code, message };
 }
 
-async function namesFor(supabase: SupabaseClient, ids: (string | null | undefined)[]) {
-  const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
-  const names = new Map<string, string>();
-  if (unique.length === 0) return names;
-  const { data, error } = await supabase.from("profiles").select("id, display_name").in("id", unique);
-  if (error) console.error("Could not load names for moderation", error.code);
-  for (const row of data ?? []) names.set(row.id as string, row.display_name as string);
-  return names;
+function namesFor(supabase: SupabaseClient, ids: (string | null | undefined)[]) {
+  return profileNames(supabase, ids, "moderation");
 }
 
 export async function reportContent(supabase: SupabaseClient, draft: ReportDraft): Promise<ServiceResult<string>> {
