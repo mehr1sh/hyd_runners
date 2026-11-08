@@ -38,8 +38,9 @@ tests/
   unit/           Vitest
   e2e/            Playwright (desktop + mobile)
 .github/workflows/
-  ci.yml          lint, typecheck, unit, RLS, build and e2e on every PR
-  db-deploy.yml   manual, approved migration deploys to the hosted project
+  ci.yml          lint, format, typecheck, RLS, unit + integration, build and e2e on every PR
+  db-deploy.yml   manual dry run of pending migrations against the hosted project (no writes)
+  db-apply.yml    manual apply of pending migrations to the hosted project
 ```
 
 Every table has RLS and the browser only holds the publishable key. The secret key, AI keys and privileged writes stay on the server (`server-only` imports enforce this).
@@ -116,7 +117,7 @@ PLAYWRIGHT_BASE_URL=https://<deployment> E2E_RUNNER_EMAIL=… E2E_RUNNER_PASSWOR
 - Supabase records applied migrations **by version (the timestamp) only**. Never edit, rename or reuse the version of a migration that has been applied anywhere shared; add a new migration instead.
 - Reference data the app needs (programmes, sessions, badges) lives in migrations. `seed.sql` is local sample data only.
 - Locally: `pnpm db:reset` rebuilds from migrations and seed (wipes data); `pnpm exec supabase migration up --local` applies new migrations and keeps data.
-- Hosted projects are migrated only by the **Deploy database migrations** workflow, never from a laptop.
+- Hosted projects are migrated only by the **Apply production database migrations** workflow (`db-apply.yml`), never from a laptop.
 
 ## Deployment
 
@@ -140,12 +141,19 @@ On a Preview deployment, RLS applies to everything, sign-up is turned off, the d
 
 **Migrations (GitHub Actions)**
 
-The GitHub environment `production` holds the variable `SUPABASE_PROJECT_ID` and the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, and requires a reviewer's approval. Run **Actions → Deploy database migrations → Run workflow** from `main` and type `migrate production`. The job waits for approval, checks that CI passed for that commit, prints a dry run and applies pending migrations. Nothing else migrates the hosted database: not merges, not Vercel builds, not tests. CI also fails if two migrations share a version.
+The GitHub environment `production` holds the variable `SUPABASE_PROJECT_ID` and the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. Configure it under **Settings → Environments → production** with the repository owner as a **required reviewer**, **Prevent self-review** off (a single maintainer must be able to approve their own run), **Allow administrators to bypass** off, and **Deployment branches** limited to `main`. Until those rules are set, the typed confirmation, the project-ID check and the CI gate are the only protections.
+
+There are two manual workflows, both run from `main`, both using that environment, and both in one concurrency group so they never run at the same time:
+
+1. **Actions → Preview production database migrations → Run workflow**, type `preview production`. Checks that CI passed for that exact commit on `main`, then prints `supabase db push --dry-run`. It writes nothing.
+2. **Actions → Apply production database migrations → Run workflow**, type `migrate production`. Waits for the environment approval (once configured), repeats the CI check and the dry run, then applies the pending migrations.
+
+Nothing else migrates the hosted database: not merges, not Vercel builds, not tests. CI also fails if two migrations share a version.
 
 **Release order**
 
 1. Merge to `main` after CI passes; Vercel deploys production.
-2. Run the migration workflow and check the dry run lists only the expected migrations.
+2. Run the preview workflow and check the dry run lists only the expected migrations, then run the apply workflow.
 3. Check `https://hydrunners.vercel.app/api/v1/health` reports `"supabaseConfigured":true`, then sign in and open the dashboard. Until migrations are applied the dashboard shows a "not available yet" notice instead of data.
 
 Free Supabase projects pause after a week without activity; open the site the day before a demo.
