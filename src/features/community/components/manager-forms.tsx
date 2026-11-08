@@ -404,32 +404,59 @@ export function PeopleForms({
             <span>
               {name(assignment.coachId)} → {name(assignment.runnerId)}
             </span>
-            <form action={removeAssignmentAction}>
-              <input type="hidden" name="assignmentId" value={assignment.id} />
-              <Button type="submit" variant="outline" size="sm">
-                Remove
-              </Button>
-            </form>
+            <RemoveAssignmentForm assignmentId={assignment.id} />
           </li>
         ))}
       </ul>
+      <p className="text-sm text-muted-foreground">
+        Removing someone&apos;s last staff role also removes their runner assignments and returns feedback assigned to
+        them to the unassigned queue. Their past messages, replies and enrolment decisions are kept.
+      </p>
       <ul className="divide-y rounded-xl border bg-card">
         {people.map((person) => (
           <li key={person.id} className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
             <span className="font-medium text-brand-navy">{person.displayName}</span>
             <span className="text-muted-foreground">{person.roles.join(", ") || "runner"}</span>
-            {person.roles.includes("coach") && (
-              <form action={revokeRoleAction}>
-                <input type="hidden" name="userId" value={person.id} />
-                <input type="hidden" name="role" value="coach" />
-                <Button type="submit" variant="ghost" size="sm">
-                  Revoke coach
-                </Button>
-              </form>
-            )}
+            {person.roles.includes("coach") && <RevokeRoleForm userId={person.id} role="coach" />}
+            {person.roles.includes("mentor") && <RevokeRoleForm userId={person.id} role="mentor" />}
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function RemoveAssignmentForm({ assignmentId }: { assignmentId: string }) {
+  const [state, action, pending] = useActionState(removeAssignmentAction, idle);
+  return (
+    <form action={action} className="flex items-center gap-2">
+      <input type="hidden" name="assignmentId" value={assignmentId} />
+      {state.status === "error" && (
+        <span role="alert" className="text-xs text-destructive">
+          {state.message}
+        </span>
+      )}
+      <Button type="submit" variant="outline" size="sm" disabled={pending}>
+        {pending ? "Removing…" : "Remove"}
+      </Button>
+    </form>
+  );
+}
+
+function RevokeRoleForm({ userId, role }: { userId: string; role: "coach" | "mentor" }) {
+  const [state, action, pending] = useActionState(revokeRoleAction, idle);
+  return (
+    <form action={action} className="flex items-center gap-2">
+      <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="role" value={role} />
+      {state.status === "error" && (
+        <span role="alert" className="text-xs text-destructive">
+          {state.message}
+        </span>
+      )}
+      <Button type="submit" variant="ghost" size="sm" disabled={pending}>
+        {pending ? "Removing…" : `Revoke ${role}`}
+      </Button>
+    </form>
   );
 }

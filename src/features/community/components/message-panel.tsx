@@ -33,7 +33,10 @@ export function MessagePanel({
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Messages stay in the app. Email and push are not sent.</p>
       {recipients.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nobody is available to message yet.</p>
+        <p className="text-sm text-muted-foreground">
+          Nobody is available to message yet. Once a coach or mentor is assigned to you, you can message them here, and
+          you can reply to programme staff who write to you. To reach the programme team, send feedback.
+        </p>
       ) : (
         <form action={action} className="space-y-3 rounded-xl border bg-card p-4">
           <Field>
