@@ -13,6 +13,7 @@ import { loadDashboardState, type TodayActivity } from "@/features/dashboard/que
 import { DashboardUnavailableNotice } from "@/features/dashboard/unavailable-notice";
 import { BadgeGrid, ChallengeList } from "@/features/gamification/components/achievement-panels";
 import { CharacterAvatar } from "@/features/gamification/components/character-avatar";
+import { PASSWORD_UPDATED_NOTICE } from "@/features/identity/logic/password-reset";
 import { startWorkoutAction } from "@/features/workouts/actions";
 import { ActionButton } from "@/features/workouts/components/action-form";
 
@@ -111,7 +112,18 @@ function TodayCard({ today, timezone }: { today: TodayActivity; timezone: string
   }
 }
 
-export default async function DashboardPage() {
+function PasswordUpdatedNotice() {
+  return (
+    <p role="status" className="mb-6 rounded-lg border border-input bg-card px-4 py-2 text-sm text-muted-foreground">
+      <span className="font-semibold text-brand-navy">Password updated.</span> Any other devices signed in to your
+      account have been signed out.
+    </p>
+  );
+}
+
+export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
+  const { notice } = await searchParams;
+  const passwordUpdated = notice === PASSWORD_UPDATED_NOTICE;
   const ctx = await getRunnerContext();
   if (!ctx)
     return (
@@ -126,6 +138,7 @@ export default async function DashboardPage() {
     return (
       <>
         <PageHeader title={`Hello, ${ctx.user.displayName}`} />
+        {passwordUpdated && <PasswordUpdatedNotice />}
         <DashboardUnavailableNotice />
       </>
     );
@@ -136,6 +149,7 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader title={`Hello, ${ctx.user.displayName}`} description={d.message} />
+      {passwordUpdated && <PasswordUpdatedNotice />}
       <div className="space-y-6">
         {ctx.isDemo && (
           <p

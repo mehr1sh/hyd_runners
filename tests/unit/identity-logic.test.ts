@@ -33,6 +33,32 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/path://x")).toBe("/dashboard");
     expect(safeNextPath(null)).toBe("/dashboard");
   });
+
+  it.each([
+    ["protocol-relative", "//evil.com"],
+    ["backslash", "/\\evil.com"],
+    ["leading backslash", "\\\\evil.com"],
+    ["tab (browsers strip it, leaving //)", "/\t/evil.com"],
+    ["newline", "/\n/evil.com"],
+    ["carriage return", "/\r/evil.com"],
+    ["null byte", "/dash\0board"],
+    ["javascript scheme", "javascript:alert(1)"],
+    ["scheme with path", "/x/https://evil.com"],
+    ["relative without slash", "evil.com"],
+    ["empty", ""],
+    ["too long", `/${"a".repeat(2048)}`],
+  ])("rejects %s", (_label, value) => {
+    expect(safeNextPath(value)).toBe("/dashboard");
+  });
+
+  it("uses the given fallback", () => {
+    expect(safeNextPath("//evil.com", "/sign-in")).toBe("/sign-in");
+  });
+
+  it("keeps encoded characters as a same-origin path", () => {
+    expect(safeNextPath("/%2F%2Fevil.com")).toBe("/%2F%2Fevil.com");
+    expect(safeNextPath("/reset-password")).toBe("/reset-password");
+  });
 });
 
 describe("authErrorMessage", () => {

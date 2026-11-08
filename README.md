@@ -117,6 +117,15 @@ Tests that create accounts or write data run only when `NEXT_PUBLIC_SUPABASE_URL
 PLAYWRIGHT_BASE_URL=https://<deployment> E2E_RUNNER_EMAIL=… E2E_RUNNER_PASSWORD=… pnpm exec playwright test test-account smoke app-shells
 ```
 
+## Password reset
+
+1. **Sign in → "Forgot password?"** opens `/forgot-password`. The email is validated, then `resetPasswordForEmail` sends a link whose `redirectTo` is `NEXT_PUBLIC_SITE_URL` + `/auth/callback?next=/reset-password` (never the request's Host header). Every well-formed request shows the same confirmation, whether or not the account exists and even when Supabase errors or rate-limits; errors are only logged on the server.
+2. **The email link** goes to Supabase's `/auth/v1/verify`, which redirects to `/auth/callback?code=…`. The callback exchanges the PKCE code for a session, so the link has to be opened in the browser that requested it. A recovery session always continues to `/reset-password`; any other `next` must be a same-origin relative path.
+3. **`/reset-password`** asks for the new password twice (the sign-up rule: at least 8 characters), calls `updateUser`, signs out every other session and opens the dashboard with a "Password updated" notice. Without a session it explains how to request a new link.
+4. **Expired, used or invalid links** (a failed code exchange, or Supabase's `?error=…&error_code=otp_expired`) land on `/forgot-password` with "This reset link is invalid or has expired. Request a new one." The error text from the URL is never shown.
+
+Supabase must allow the callback URL **with a query string**, which is why each redirect entry ends in `**`. Locally `supabase/config.toml` allows `http://localhost:*/auth/callback**` and `http://127.0.0.1:*/auth/callback**`; it takes effect on the next `pnpm db:start`. Reset emails appear in Mailpit at http://127.0.0.1:54324.
+
 ## Supabase migrations
 
 - Every schema change is a new file in `supabase/migrations/`, created with `pnpm db:new <name>`. Files run in order of their timestamp prefix.
@@ -142,7 +151,7 @@ On a Preview deployment, RLS applies to everything, sign-up is turned off, the d
 **Supabase (Mumbai region)**
 
 1. Settings → API Keys: the publishable (`sb_publishable_…`) and secret (`sb_secret_…`) keys. The secret key goes only in server-side variables; the build refuses a secret key in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-2. Authentication → URL Configuration: Site URL `https://hydrunners.vercel.app`, redirect URL `https://hydrunners.vercel.app/auth/callback`. Keep "Confirm email" on.
+2. Authentication → URL Configuration: Site URL `https://hydrunners.vercel.app`, redirect URL `https://hydrunners.vercel.app/auth/callback**` (the `**` admits the `?next=…` query that sign-up and password-reset links carry). Keep "Confirm email" on. Preview deployments send links to production (`NEXT_PUBLIC_SITE_URL`), so no preview pattern is needed, and a reset started on a preview cannot be completed there. Supabase's built-in email service only delivers to project team members and is heavily rate-limited; set up custom SMTP (Authentication → Emails) before relying on password reset for runners.
 
 **Vercel:** import the repository (Next.js and pnpm are detected), set the function region to `bom1`, and add the variables with the scopes above.
 

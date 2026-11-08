@@ -7,16 +7,20 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { isPreviewDeployment } from "@/lib/env.server";
 import { createClient } from "@/lib/supabase/server";
-import { authErrorMessage, safeNextPath } from "./logic/auth";
+import { authErrorMessage, Credentials, safeNextPath } from "./logic/auth";
+import {
+  ForgotPasswordForm,
+  PASSWORD_UPDATED_NOTICE,
+  passwordResetRedirectUrl,
+  passwordUpdateError,
+  RESET_REQUESTED_MESSAGE,
+  RESET_SESSION_MISSING_MESSAGE,
+  ResetPasswordForm,
+} from "./logic/password-reset";
 import { isValidTimeZone, parseExperienceForm, parsePlacesForm, parseTrainingForm } from "./logic/onboarding";
 import { saveExperience, savePlaces, saveTraining } from "./service";
 
 export type AuthFormState = { status: "idle" | "error" | "check_email"; message?: string };
-
-const Credentials = z.object({
-  email: z.email("Enter a valid email address."),
-  password: z.string().min(8, "Use at least 8 characters."),
-});
 
 const SignUpForm = Credentials.extend({
   displayName: z.string().trim().min(1, "Tell us what to call you.").max(60),
@@ -79,6 +83,66 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
   // With email confirmation on, there is no session until the link is clicked.
   if (!data.session) return { status: "check_email" };
   redirect("/onboarding");
+}
+
+export type ForgotPasswordState = { status: "idle" | "error" | "sent"; message?: string };
+
+/**
+ * Starts a password reset. Never reveals whether the address has an account:
+ * every well-formed request gets the same response, including when Supabase
+ * fails or rate-limits (its per-address rate limit only fires for existing
+ * accounts, so passing it on would leak that the account exists).
+ */
+export async function requestPasswordReset(
+  _prev: ForgotPasswordState,
+  formData: FormData,
+): Promise<ForgotPasswordState> {
+  if (!isSupabaseConfigured) return { status: "error", message: "Password reset is unavailable in preview mode." };
+
+  const parsed = ForgotPasswordForm.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: passwordResetRedirectUrl(publicEnv.NEXT_PUBLIC_SITE_URL),
+  });
+  // Logged without the address; the user sees the same confirmation either way.
+  if (error) console.error(`[auth] Password reset request failed (${error.code ?? error.status}): ${error.message}`);
+
+  return { status: "sent", message: RESET_REQUESTED_MESSAGE };
+}
+
+export type ResetPasswordState = { status: "idle" | "error"; message?: string; sessionMissing?: boolean };
+
+/** Sets a new password for the session the reset link established, then signs out other sessions. */
+export async function resetPassword(_prev: ResetPasswordState, formData: FormData): Promise<ResetPasswordState> {
+  if (!isSupabaseConfigured) return { status: "error", message: "Password reset is unavailable in preview mode." };
+
+  const parsed = ResetPasswordForm.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { status: "error", message: RESET_SESSION_MISSING_MESSAGE, sessionMissing: true };
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    const mapped = passwordUpdateError(error);
+    if (!mapped.sessionMissing && !["same_password", "weak_password"].includes(error.code ?? "")) {
+      console.error(`[auth] Password update failed (${error.code ?? error.status}): ${error.message}`);
+    }
+    return { status: "error", message: mapped.message, sessionMissing: mapped.sessionMissing };
+  }
+
+  // Anyone else holding a session (e.g. whoever knew the old password) is signed out.
+  // The password is already changed, so a failure here is logged, not shown.
+  const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
+  if (signOutError) console.error(`[auth] Could not sign out other sessions: ${signOutError.message}`);
+
+  redirect(`/dashboard?notice=${PASSWORD_UPDATED_NOTICE}`);
 }
 
 export async function signOut() {
