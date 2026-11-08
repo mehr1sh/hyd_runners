@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { sendMessageAction, type FormState } from "../actions";
+import { ReportForm } from "./report-form";
 
 const idle: FormState = { status: "idle" };
 const selectClass =
@@ -22,7 +23,9 @@ export function MessagePanel({
     senderId: string;
     senderName: string;
     recipientName: string;
-    body: string;
+    body: string | null;
+    hidden: boolean;
+    reported: boolean;
     createdAt: string;
   }[];
   recipients: { id: string; displayName: string; roles: string[] }[];
@@ -33,7 +36,10 @@ export function MessagePanel({
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Messages stay in the app. Email and push are not sent.</p>
       {recipients.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nobody is available to message yet.</p>
+        <p className="text-sm text-muted-foreground">
+          Nobody is available to message yet. Once a coach or mentor is assigned to you, you can message them here, and
+          you can reply to programme staff who write to you. To reach the programme team, send feedback.
+        </p>
       ) : (
         <form action={action} className="space-y-3 rounded-xl border bg-card p-4">
           <Field>
@@ -75,10 +81,19 @@ export function MessagePanel({
               <p className="font-medium text-brand-navy">
                 {message.senderId === viewerId ? "You" : message.senderName} to {message.recipientName}
               </p>
-              <p className="mt-1">{message.body}</p>
+              {message.hidden ? (
+                <p className="mt-1 text-muted-foreground italic">This message was removed by a moderator.</p>
+              ) : (
+                <p className="mt-1 whitespace-pre-wrap">{message.body}</p>
+              )}
               <p className="mt-1 text-xs text-muted-foreground">
                 <time dateTime={message.createdAt}>{when.format(new Date(message.createdAt))}</time>
               </p>
+              {message.senderId !== viewerId && !message.hidden && (
+                <div className="mt-2">
+                  <ReportForm targetType="message" targetId={message.id} alreadyReported={message.reported} />
+                </div>
+              )}
             </li>
           ))}
         </ol>

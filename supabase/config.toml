@@ -160,8 +160,14 @@ enabled = true
 site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
-# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback", "http://localhost:3000/auth/callback"]
+# URLs (glob patterns) that auth links and providers may redirect to after authentication.
+# Email links carry a query (`/auth/callback?next=/reset-password`), so each entry ends in `**`
+# (the match covers the whole URL, query included). `*` in the port allows any local port,
+# e.g. Playwright on 3100. Hosts matching site_url's host are always allowed.
+additional_redirect_urls = [
+  "http://127.0.0.1:*/auth/callback**",
+  "http://localhost:*/auth/callback**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.

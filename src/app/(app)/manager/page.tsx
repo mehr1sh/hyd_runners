@@ -3,6 +3,7 @@ import { AccessDenied } from "@/components/shared/access-denied";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlaceholderNotice } from "@/components/shared/placeholder-notice";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AuditLogTable } from "@/features/community/components/audit-log-table";
 import { FeedbackPanel } from "@/features/community/components/feedback-panel";
 import {
   AnnouncementForm,
@@ -12,6 +13,8 @@ import {
   PeopleForms,
 } from "@/features/community/components/manager-forms";
 import { MessagePanel } from "@/features/community/components/message-panel";
+import { ModerationQueue } from "@/features/community/components/moderation-queue";
+import { listAuditLog, listReportQueue } from "@/features/community/moderation";
 import {
   listAnnouncements,
   listFeedback,
@@ -27,7 +30,9 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Programme manager" };
 
-export default async function ManagerPage() {
+const TABS = ["announcements", "events", "places", "feedback", "people", "reports", "messages", "audit"] as const;
+
+export default async function ManagerPage({ searchParams }: PageProps<"/manager">) {
   const access = await requireRole(["programme_manager", "admin"]);
   if (!access.allowed) return <AccessDenied area="Programme management" />;
 
@@ -44,7 +49,18 @@ export default async function ManagerPage() {
     );
   }
 
-  const data = await load(user.id);
+  const sp = await searchParams;
+  const isAdmin = user.roles.includes("admin");
+  const requestedTab = typeof sp.tab === "string" ? sp.tab : "";
+  const tab =
+    (TABS as readonly string[]).includes(requestedTab) && (requestedTab !== "audit" || isAdmin)
+      ? requestedTab
+      : "announcements";
+  const auditBefore =
+    typeof sp.auditBefore === "string" && /^\d{1,18}$/.test(sp.auditBefore) ? Number(sp.auditBefore) : undefined;
+  const peopleQuery = typeof sp.people === "string" ? sp.people : "";
+  const peoplePage = typeof sp.page === "string" && /^\d{1,4}$/.test(sp.page) ? Number(sp.page) : 0;
+  const data = await load(user.id, isAdmin, auditBefore, { query: peopleQuery, page: peoplePage });
 
   return (
     <>
@@ -56,8 +72,8 @@ export default async function ManagerPage() {
         <PlaceholderNotice feature="programme publishing">
           Creating training programmes stays with the training area. This page covers community management only.
         </PlaceholderNotice>
-        <Tabs defaultValue="announcements">
-          {/* Six tabs do not fit a phone; scroll instead of clipping the last ones. */}
+        <Tabs defaultValue={tab}>
+          {/* Seven or eight tabs do not fit a phone; scroll instead of clipping the last ones. */}
           <div className="max-w-full overflow-x-auto pb-1">
             <TabsList>
               <TabsTrigger value="announcements">Announcements</TabsTrigger>
@@ -65,7 +81,12 @@ export default async function ManagerPage() {
               <TabsTrigger value="places">Places</TabsTrigger>
               <TabsTrigger value="feedback">Feedback</TabsTrigger>
               <TabsTrigger value="people">People</TabsTrigger>
+              <TabsTrigger value="reports">
+                Reports
+                {data.reports.ok && data.reports.data.open.length > 0 ? ` (${data.reports.data.open.length})` : ""}
+              </TabsTrigger>
               <TabsTrigger value="messages">Messages</TabsTrigger>
+              {isAdmin && <TabsTrigger value="audit">Audit log</TabsTrigger>}
             </TabsList>
           </div>
           <TabsContent value="announcements" className="space-y-4 pt-4">
@@ -97,7 +118,8 @@ export default async function ManagerPage() {
               <FeedbackPanel
                 items={data.feedback.data}
                 mode="manager"
-                staff={(data.people.ok ? data.people.data.people : []).filter((person) =>
+                viewerId={user.id}
+                staff={(data.people.ok ? data.people.data.staff : []).filter((person) =>
                   person.roles.some((role) => role === "coach" || role === "mentor" || role === "programme_manager"),
                 )}
               />
@@ -107,9 +129,21 @@ export default async function ManagerPage() {
           </TabsContent>
           <TabsContent value="people" className="pt-4">
             {data.people.ok ? (
-              <PeopleForms people={data.people.data.people} assignments={data.people.data.assignments} />
+              <PeopleForms {...data.people.data} />
             ) : (
               <p className="text-sm text-destructive">{data.people.message}</p>
+            )}
+          </TabsContent>
+          <TabsContent value="reports" className="pt-4">
+            {data.reports.ok ? (
+              <ModerationQueue
+                open={data.reports.data.open}
+                resolved={data.reports.data.resolved}
+                moreOpen={data.reports.data.moreOpen}
+                viewerId={user.id}
+              />
+            ) : (
+              <p className="text-sm text-destructive">{data.reports.message}</p>
             )}
           </TabsContent>
           <TabsContent value="messages" className="pt-4">
@@ -119,23 +153,44 @@ export default async function ManagerPage() {
               <p className="text-sm text-destructive">Could not load messages.</p>
             )}
           </TabsContent>
+          {isAdmin && (
+            <TabsContent value="audit" className="pt-4">
+              {data.audit?.ok ? (
+                <AuditLogTable
+                  entries={data.audit.data.entries}
+                  nextBefore={data.audit.data.nextBefore}
+                  paged={auditBefore !== undefined}
+                />
+              ) : (
+                <p className="text-sm text-destructive">{data.audit?.message ?? "Could not load the audit log."}</p>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </>
   );
 }
 
-async function load(userId: string) {
+async function load(
+  userId: string,
+  isAdmin: boolean,
+  auditBefore: number | undefined,
+  peopleOptions: { query: string; page: number },
+) {
   const supabase = await createClient();
-  const [announcements, events, locations, updates, feedback, people, messages, recipients] = await Promise.all([
-    listAnnouncements(supabase, userId),
-    listManagedEvents(supabase),
-    listLocations(supabase),
-    listLocationUpdates(supabase),
-    listFeedback(supabase, userId),
-    listPeople(supabase, userId),
-    listMessages(supabase, userId),
-    listRecipients(supabase),
-  ]);
-  return { announcements, events, locations, updates, feedback, people, messages, recipients };
+  const [announcements, events, locations, updates, feedback, people, messages, recipients, reports, audit] =
+    await Promise.all([
+      listAnnouncements(supabase, userId),
+      listManagedEvents(supabase),
+      listLocations(supabase),
+      listLocationUpdates(supabase),
+      listFeedback(supabase, userId),
+      listPeople(supabase, userId, peopleOptions),
+      listMessages(supabase, userId),
+      listRecipients(supabase),
+      listReportQueue(supabase),
+      isAdmin ? listAuditLog(supabase, { before: auditBefore }) : null,
+    ]);
+  return { announcements, events, locations, updates, feedback, people, messages, recipients, reports, audit };
 }

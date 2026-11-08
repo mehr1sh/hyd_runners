@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(49);
+select plan(50);
 
 -- Four users: two runners, one coach, one manager.
 insert into auth.users (id, email, raw_user_meta_data, aud, role)
@@ -157,16 +157,17 @@ select throws_ok(
   '42501', null, 'runner cannot message an unrelated runner'
 );
 
-select lives_ok(
+-- Runners reach managers through Feedback until a manager writes to them.
+select throws_ok(
   $$ insert into public.messages (sender_id, recipient_id, body)
      values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'hello manager') $$,
-  'runner can message a manager'
+  '42501', null, 'runner cannot start a conversation with a manager'
 );
 
 select is(
   (select count(*)::int from public.messages),
-  1,
-  'runner sees only their own messages'
+  0,
+  'runner has no messages yet'
 );
 
 select throws_ok(
@@ -360,9 +361,12 @@ select lives_ok(
 
 select is(
   (select count(*)::int from public.messages where recipient_id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')),
-  2,
-  'managers can read all messages'
+  0,
+  'managers cannot read other people''s conversations'
 );
+
+insert into public.messages (sender_id, recipient_id, body)
+values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'checking in');
 
 delete from public.coach_assignments where runner_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 select is(
@@ -402,7 +406,13 @@ select is(
     where id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
                  'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')),
   '{cccccccc-cccc-4ccc-8ccc-cccccccccccc,dddddddd-dddd-4ddd-8ddd-dddddddddddd}',
-  'runner can message only their coach and managers'
+  'runner can message only their coach and a manager who wrote to them'
+);
+
+select lives_ok(
+  $$ insert into public.messages (sender_id, recipient_id, body)
+     values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'thanks') $$,
+  'runner can reply to a manager who wrote to them'
 );
 
 reset role;

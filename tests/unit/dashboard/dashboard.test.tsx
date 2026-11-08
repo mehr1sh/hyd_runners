@@ -26,7 +26,9 @@ let ctx: Awaited<ReturnType<typeof import("@/features/dashboard/context").getRun
 vi.mock("@/features/dashboard/context", () => ({ getRunnerContext: async () => ctx }));
 
 const { loadDashboardState } = await import("@/features/dashboard/queries");
-const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
+const { default: DashboardRoute } = await import("@/app/(app)/dashboard/page");
+const DashboardPage = (searchParams: Record<string, string> = {}) =>
+  DashboardRoute({ params: Promise.resolve({}), searchParams: Promise.resolve(searchParams) });
 
 const TZ = "Asia/Kolkata";
 const COUCH_ID = "0547c1bc-2e00-51d2-8107-df7f55515630";
@@ -175,6 +177,27 @@ describe("loadDashboardState", () => {
     await expect(failure).rejects.toMatchObject({ code: "57014", source: "workout_logs" });
   });
 
+  it("shows the not-available notice when a new database function is not deployed yet", async () => {
+    client = fakeSupabase({
+      "rpc:my_reward_totals": {
+        data: null,
+        error: { message: "Could not find the function public.my_reward_totals", code: "PGRST202" },
+      },
+    });
+    await expect(loadDashboardState(makeCtx(client))).resolves.toMatchObject({ status: "schema_missing" });
+  });
+
+  it("uses database totals and a database count, not the rows the API returns", async () => {
+    client = fakeSupabase({
+      ...completeRunnerTables(),
+      "rpc:my_reward_totals": { data: [{ total_xp: 12345, total_coins: 678, ledger_rows: 4000 }], error: null },
+    });
+    const state = await loadDashboardState(makeCtx(client));
+    if (state.status !== "ready") throw new Error(state.status);
+    expect(state.data.game.summary.totalXp).toBe(12345);
+    expect(state.data.game.summary.coins).toBe(678);
+  });
+
   it("treats a missing scheduler table as no planned workouts, not a failure", async () => {
     client = fakeSupabase({ scheduled_workouts: missingTable("scheduled_workouts") });
     expect((await loadDashboardState(makeCtx(client))).status).toBe("ready");
@@ -215,6 +238,18 @@ describe("DashboardPage (server render)", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Hello, Runner");
     expect(screen.getByRole("status")).toHaveTextContent("Your dashboard is not available yet.");
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+
+  it("confirms a completed password reset only for the known notice value", async () => {
+    client = fakeSupabase(completeRunnerTables());
+    ctx = makeCtx(client);
+    const { unmount } = render(await DashboardPage({ notice: "password-updated" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/password updated/i);
+    unmount();
+
+    render(await DashboardPage({ notice: "<script>alert(1)</script>" }));
+    expect(screen.queryByText(/password updated/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/script/)).not.toBeInTheDocument();
   });
 
   it("propagates unexpected database failures to the error boundary", async () => {

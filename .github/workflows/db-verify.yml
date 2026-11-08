@@ -1,0 +1,74 @@
+name: Verify production database schema
+
+# Read-only check after a production migration: lists applied migrations and
+# compares the production schema with one built from supabase/migrations
+# (the schema every RLS/pgTAP test runs against). Fails on any drift.
+# It never writes to the production database.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Production schema matches migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    env:
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check ref and configuration
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow from main (got $GITHUB_REF)."; exit 1
+          fi
+          if [ "$SUPABASE_PROJECT_ID" != "nhazbqwzdxcvurdfwaos" ]; then
+            echo "::error::Unexpected Supabase project ID."; exit 1
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        with:
+          version: 2.120.0
+      - name: Link production project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Applied migrations
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Schema drift (public, private)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase db diff --linked --schema public,private > drift.sql
+          # Objects Supabase manages outside our migrations, allowed by exact name:
+          # public.rls_auto_enable() is the event-trigger function behind the
+          # dashboard's "automatically enable RLS on new tables" setting.
+          python3 - <<'PY'
+          import re
+          sql = open("drift.sql").read()
+          sql = re.sub(r"CREATE OR REPLACE FUNCTION public\.rls_auto_enable\(\).*?\$function\$;", "", sql, flags=re.S)
+          sql = "\n".join(l for l in sql.splitlines() if "rls_auto_enable" not in l)
+          open("drift-filtered.sql", "w").write(sql)
+          PY
+          if grep -Eiq '^\s*(create|alter|drop|grant|revoke|comment)\b' drift-filtered.sql; then
+            echo "::error::Production schema differs from supabase/migrations:"
+            cat drift-filtered.sql
+            exit 1
+          fi
+          echo "No drift: production public/private schema matches the migrations applied."

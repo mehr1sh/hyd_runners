@@ -6,7 +6,7 @@ import { addDays, localDate, localMidnightUtc } from "@/features/gamification/lo
 import { loadGamification } from "@/features/gamification/queries";
 import { listPlannedWorkouts } from "@/features/workouts/planned-source";
 import { listProgrammes } from "@/features/workouts/programme-queries";
-import { getInProgressWorkout, listCompletedWorkouts } from "@/features/workouts/queries";
+import { countCompletedWorkouts, getInProgressWorkout, listCompletedWorkouts } from "@/features/workouts/queries";
 import { DatabaseQueryError, isMissingSchemaError } from "@/lib/supabase/errors";
 import type { RunnerContext } from "./context";
 
@@ -27,9 +27,11 @@ export type TodayActivity =
   | { kind: "none" };
 
 export async function loadDashboard(ctx: RunnerContext) {
-  const [inProgress, completed, programmes, planned, events] = await Promise.all([
+  // Recent workouts cover this week and today; lifetime figures come from the database.
+  const [inProgress, completed, totalWorkouts, programmes, planned, events] = await Promise.all([
     getInProgressWorkout(ctx),
-    listCompletedWorkouts(ctx),
+    listCompletedWorkouts(ctx, 200),
+    countCompletedWorkouts(ctx),
     listProgrammes(ctx),
     listPlannedWorkouts(ctx.supabase, ctx.user.id, {
       from: localMidnightUtc(ctx.today, ctx.timezone),
@@ -104,7 +106,7 @@ export async function loadDashboard(ctx: RunnerContext) {
   ].slice(0, 4);
 
   const message = motivationalMessage({
-    totalWorkouts: completed.length,
+    totalWorkouts,
     workedOutToday: !!doneToday,
     streak: game.daily,
     restRecommended: game.recovery.restRecommended,
@@ -121,7 +123,7 @@ export async function loadDashboard(ctx: RunnerContext) {
     allProgrammes: programmes,
     events,
     message,
-    totalWorkouts: completed.length,
+    totalWorkouts,
   };
 }
 

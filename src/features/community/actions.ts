@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { reconcileRewards } from "@/features/gamification/service";
+import { PrivilegedAccessUnavailableError } from "@/lib/supabase/admin";
 import { assertGrantableRole } from "./logic/access";
 import {
   parseAnnouncementForm,
@@ -16,6 +17,8 @@ import {
   parseMessageForm,
 } from "./logic/content";
 import { parseFeedbackForm, parseReplyForm } from "./logic/feedback";
+import { parseReportForm, parseResolutionForm } from "./logic/moderation";
+import { reportContent, resolveReport, viewReportedContent, type ReportedContent } from "./moderation";
 import {
   assignCoach,
   grantStaffRole,
@@ -156,14 +159,16 @@ export async function grantRoleAction(_prev: FormState, formData: FormData): Pro
   return done(saved, "Role granted.", ["/manager", "/coach"]);
 }
 
-export async function revokeRoleAction(formData: FormData) {
+export async function revokeRoleAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const current = await session();
-  if (!current.ok) return;
+  if (!current.ok) return { status: "error", message: current.message };
   const role = String(formData.get("role") ?? "");
   const targetId = String(formData.get("userId") ?? "");
-  if (!assertGrantableRole(role)) return;
-  await revokeStaffRole(current.supabase, current.user.id, targetId, role);
-  revalidatePath("/manager");
+  if (!assertGrantableRole(role)) return { status: "error", message: "You can only remove coach or mentor." };
+  const saved = await revokeStaffRole(current.supabase, current.user.id, targetId, role);
+  // The database also removes their assignments and unassigns their feedback
+  // once they hold no staff role (migration 20261109120000).
+  return done(saved, "Role removed.", ["/manager", "/coach"]);
 }
 
 export async function assignCoachAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -178,11 +183,50 @@ export async function assignCoachAction(_prev: FormState, formData: FormData): P
   return done(saved, "Coach assigned.", ["/manager", "/coach"]);
 }
 
-export async function removeAssignmentAction(formData: FormData) {
+export async function removeAssignmentAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const current = await session();
-  if (!current.ok) return;
-  await removeAssignment(current.supabase, current.user.id, String(formData.get("assignmentId") ?? ""));
-  revalidatePath("/manager");
+  if (!current.ok) return { status: "error", message: current.message };
+  const saved = await removeAssignment(current.supabase, current.user.id, String(formData.get("assignmentId") ?? ""));
+  return done(saved, "Assignment removed.", ["/manager", "/coach"]);
+}
+
+// ---------------------------------------------------------------------------
+// Reports and moderation
+// ---------------------------------------------------------------------------
+
+export async function reportContentAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const parsed = parseReportForm(formData);
+  if (!parsed.ok) return { status: "error", message: parsed.message };
+  const saved = await reportContent(current.supabase, parsed.data);
+  return done(saved, "Thanks. A moderator will review your report.", ["/community", "/coach", "/manager"]);
+}
+
+export type ReportedContentState =
+  { status: "idle" } | { status: "error"; message: string } | { status: "ok"; content: ReportedContent };
+
+/** Opens the reported item for a moderator. The database audits every call. */
+export async function viewReportedContentAction(
+  _prev: ReportedContentState,
+  formData: FormData,
+): Promise<ReportedContentState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const reportId = z.uuid().safeParse(formData.get("reportId"));
+  if (!reportId.success) return { status: "error", message: "Report not found." };
+  const result = await viewReportedContent(current.supabase, reportId.data);
+  if (!result.ok) return { status: "error", message: result.message };
+  return { status: "ok", content: result.data };
+}
+
+export async function resolveReportAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const parsed = parseResolutionForm(formData);
+  if (!parsed.ok) return { status: "error", message: parsed.message };
+  const saved = await resolveReport(current.supabase, parsed.data);
+  return done(saved, "Decision recorded.", ["/manager", "/community", "/coach"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,14 +250,29 @@ export async function rsvpAction(_prev: RsvpState, formData: FormData): Promise<
     if (error.message.includes("full")) return { status: "error", message: "Sorry, this event is full." };
     if (error.message.includes("not open"))
       return { status: "error", message: "This event is no longer taking sign-ups." };
+    if (error.code === "PT429")
+      return { status: "error", message: "You've changed your RSVP a lot. Please wait a few minutes and try again." };
     console.error(error);
     return { status: "error", message: "Could not update your RSVP." };
   }
-  if (status.data === "going") await reconcileRewards(user.id);
+  // Badges are awarded with the secret key. Deployments without it (Vercel
+  // Preview) still save the RSVP; the badge is awarded on the next workout
+  // or RSVP made where the key is configured.
+  if (status.data === "going") await awardRsvpRewards(user.id);
   revalidatePath("/events");
   revalidatePath("/map");
   revalidatePath("/dashboard");
   return { status: "ok", message: status.data === "going" ? "You're going!" : "RSVP cancelled." };
+}
+
+async function awardRsvpRewards(userId: string) {
+  try {
+    await reconcileRewards(userId);
+  } catch (error) {
+    if (error instanceof PrivilegedAccessUnavailableError) return;
+    // The RSVP itself is saved; a reward failure must not undo or hide that.
+    console.error("[rsvp] could not reconcile rewards", error instanceof Error ? error.name : error);
+  }
 }
 
 export async function setLeaderboardVisibilityAction(formData: FormData) {

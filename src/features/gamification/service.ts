@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchAllPages } from "@/features/shared/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TIMEZONE, type WorkoutType } from "@/lib/contracts";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,16 +35,29 @@ type LogRow = {
 export async function loadRewardHistory(admin: SupabaseClient, userId: string): Promise<RewardHistory> {
   const timezone = await getUserTimezone(admin, userId);
 
-  const [logs, enrollments, rsvp, ledger] = await Promise.all([
-    admin
-      .from("workout_logs")
-      .select(
-        "id, workout_type, started_at, completed_at, duration_seconds, distance_meters, programme_session_id, enrollment_id, planned_workout_id",
-      )
-      .eq("user_id", userId)
-      .eq("status", "completed")
-      .order("started_at")
-      .limit(5000),
+  // The whole history, read in pages: rewards are recomputed from every workout.
+  const [logRows, streakKeys, enrollments, rsvp] = await Promise.all([
+    fetchAllPages<LogRow>((from, to) =>
+      admin
+        .from("workout_logs")
+        .select(
+          "id, workout_type, started_at, completed_at, duration_seconds, distance_meters, programme_session_id, enrollment_id, planned_workout_id",
+        )
+        .eq("user_id", userId)
+        .eq("status", "completed")
+        .order("started_at")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAllPages<{ award_key: string }>((from, to) =>
+      admin
+        .from("xp_ledger")
+        .select("award_key")
+        .eq("user_id", userId)
+        .like("award_key", "streak:%")
+        .order("award_key")
+        .range(from, to),
+    ),
     admin.from("enrollments").select("id, programmes!inner(slug, programme_sessions(id, week))").eq("user_id", userId),
     admin
       .from("event_rsvps")
@@ -52,11 +66,10 @@ export async function loadRewardHistory(admin: SupabaseClient, userId: string): 
       .eq("status", "going")
       .order("created_at")
       .limit(1),
-    admin.from("xp_ledger").select("award_key").eq("user_id", userId).like("award_key", "streak:%"),
   ]);
-  for (const r of [logs, enrollments, rsvp, ledger]) if (r.error) throw new Error(r.error.message);
+  for (const r of [enrollments, rsvp]) if (r.error) throw new Error(r.error.message);
 
-  const rows = (logs.data ?? []) as LogRow[];
+  const rows = logRows;
   const plannedIds = rows.map((r) => r.planned_workout_id).filter((x): x is string => !!x);
   const planned = await getPlannedWorkouts(admin, userId, plannedIds);
   const plannedDate = new Map(planned.map((p) => [p.id, localDate(p.startsAt, timezone)]));
@@ -86,7 +99,7 @@ export async function loadRewardHistory(admin: SupabaseClient, userId: string): 
     workouts,
     enrollments: enrollmentFacts,
     firstRsvpAt: rsvp.data?.[0]?.created_at ? new Date(rsvp.data[0].created_at).toISOString() : null,
-    existingAwardKeys: (ledger.data ?? []).map((r) => r.award_key as string),
+    existingAwardKeys: streakKeys.map((r) => r.award_key),
   };
 }
 

@@ -5,6 +5,10 @@ on:
   push:
     branches: [main, "feature/**"]
 
+# Least privilege: CI only reads the repository.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -12,24 +16,34 @@ concurrency:
 jobs:
   app:
     name: Lint, typecheck, unit tests, build, e2e
-    runs-on: ubuntu-latest
+    # Pinned so a runner image migration (ubuntu-latest moves to 26.04 from
+    # October 2026) is a deliberate change, not a surprise.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      # Third-party actions are pinned to full commit SHAs (tag in the comment).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Migration versions are unique
         # Supabase tracks applied migrations by version only; a reused
         # version is silently skipped on databases that already have it.
         run: |
           dupes=$(find supabase/migrations -name '*.sql' -printf '%f\n' | cut -d_ -f1 | sort | uniq -d)
           if [ -n "$dupes" ]; then echo "::error::Duplicate migration versions: $dupes"; exit 1; fi
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm format:check
       - run: pnpm typecheck
-      - run: pnpm test
+
+      # The local Supabase stack and .env.local come before the unit tests so
+      # the *.integration.test.ts files (Data API, RLS, rate limits) run
+      # instead of skipping themselves.
       - name: Start local Supabase
         run: pnpm exec supabase start -x studio,imgproxy,vector,logflare,edge-runtime
       - name: Write local env
@@ -43,14 +57,41 @@ jobs:
             echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
             echo "AI_PROVIDER=none"
           } > .env.local
+          rm sb.env
       - name: Database tests (RLS)
         run: pnpm db:test
+      - name: Unit and integration tests
+        env:
+          # Opt-in for the scheduler API suite (uploads, planning, AI fallback).
+          SCHEDULER_INTEGRATION: "1"
+        # The scheduler suite reads the Supabase settings from the environment.
+        run: |
+          set -a; . ./.env.local; set +a
+          pnpm exec vitest run --reporter=default --reporter=json --outputFile.json=vitest-results.json
+      - name: Integration tests ran
+        # Supabase-backed suites skip themselves when the stack or env is
+        # missing. Fail instead of silently dropping the permission tests.
+        run: |
+          node -e '
+            const r = require("./vitest-results.json");
+            const files = r.testResults.filter((f) => f.name.endsWith(".integration.test.ts"));
+            const notRun = files.flatMap((f) => f.assertionResults).filter((t) => t.status !== "passed");
+            if (files.length === 0 || notRun.length > 0) {
+              console.error(`::error::${files.length} integration files; ${notRun.length} tests did not pass`);
+              for (const t of notRun) console.error(`  ${t.status}: ${t.fullName}`);
+              process.exit(1);
+            }
+            console.log(`${files.length} integration files, all tests passed`);
+          '
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report
-          path: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
           retention-days: 7

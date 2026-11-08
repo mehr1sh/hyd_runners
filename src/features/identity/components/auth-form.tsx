@@ -47,6 +47,16 @@ export function AuthForm({ mode, next }: { mode: "sign-in" | "sign-up"; next?: s
             minLength={8}
             required
           />
+          {mode === "sign-in" && (
+            <p className="text-right text-sm">
+              <Link
+                href="/forgot-password"
+                className="font-medium text-brand-red-strong underline-offset-4 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </p>
+          )}
         </Field>
       </FieldGroup>
 

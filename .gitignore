@@ -50,3 +50,4 @@ supabase/.branches
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+vitest-results.json
