@@ -5,6 +5,7 @@ import {
   CircleUserRound,
   ClipboardList,
   Dumbbell,
+  Flag,
   LayoutDashboard,
   MapPin,
   CalendarCheck,
@@ -32,6 +33,7 @@ export const RUNNER_NAV: NavItem[] = [
   { href: "/reports", label: "Reports", icon: ChartColumn },
   { href: "/community", label: "Community", icon: Users },
   { href: "/events", label: "Events", icon: CalendarCheck },
+  { href: "/clubs", label: "Clubs", icon: Flag },
   { href: "/map", label: "Map", icon: MapPin },
   { href: "/profile", label: "Profile", icon: CircleUserRound },
 ];

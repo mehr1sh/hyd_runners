@@ -12,6 +12,7 @@ export const PROTECTED_PREFIXES = [
   "/reports",
   "/community",
   "/events",
+  "/clubs",
   "/map",
   "/profile",
   "/coach",

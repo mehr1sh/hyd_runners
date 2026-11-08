@@ -107,6 +107,7 @@ export function AnnouncementForm({
 export function EventForm({
   event,
   locations,
+  clubId,
 }: {
   event?: {
     id: string;
@@ -122,12 +123,15 @@ export function EventForm({
     registrationClosesAt?: string | null;
   };
   locations: { id: string; name: string }[];
+  /** Creates the event for this club (club admins). */
+  clubId?: string;
 }) {
   const [state, action, pending] = useActionState(saveEventAction, idle);
   const idPrefix = event?.id ?? "new-event";
   return (
     <form action={action} className="space-y-4 rounded-xl border bg-card p-4">
       {event && <input type="hidden" name="id" value={event.id} />}
+      {clubId && !event && <input type="hidden" name="clubId" value={clubId} />}
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-title`}>Title</FieldLabel>
