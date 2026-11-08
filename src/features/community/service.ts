@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Role } from "@/lib/contracts";
 import { CommunityEvent, Location } from "@/lib/contracts";
 import { dbFailure, type ServiceResult } from "@/features/shared/db";
+import { isMissingSchemaError } from "@/lib/supabase/errors";
 import { canManageCommunity, hasAnyRole, MANAGER_ROLES } from "./logic/access";
 import { AnnouncementView, LocationUpdate, type DirectMessage } from "./logic/content";
 import { isUnread } from "./logic/dates";
@@ -46,18 +47,43 @@ export async function submitFeedback(supabase: SupabaseClient, userId: string, i
   return { ok: true as const, data: mapFeedback(data) };
 }
 
+type ReplyRow = {
+  id: string;
+  feedback_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  hidden_at?: string | null;
+};
+type MessageRow = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  created_at: string;
+  hidden_at?: string | null;
+};
+
+async function readReplies(supabase: SupabaseClient, feedbackIds: string[]) {
+  const read = (columns: string) =>
+    supabase
+      .from("feedback_replies")
+      .select(columns)
+      .in("feedback_id", feedbackIds)
+      .order("created_at", { ascending: true });
+  let result = await read("id, feedback_id, author_id, body, created_at, hidden_at");
+  // hidden_at arrives with the moderation migration; read without it until then.
+  if (result.error && isMissingSchemaError(result.error))
+    result = await read("id, feedback_id, author_id, body, created_at");
+  return { data: (result.data ?? []) as unknown as ReplyRow[], error: result.error };
+}
+
 export async function listFeedback(supabase: SupabaseClient, userId: string) {
   const { data, error } = await supabase.from("feedback").select("*").order("created_at", { ascending: false });
   if (error) return dbFailure(error, "Could not load feedback.");
   const rows = data ?? [];
   const ids = rows.map((row) => row.id as string);
-  const replies = ids.length
-    ? await supabase
-        .from("feedback_replies")
-        .select("id, feedback_id, author_id, body, created_at, hidden_at")
-        .in("feedback_id", ids)
-        .order("created_at", { ascending: true })
-    : { data: [], error: null };
+  const replies = ids.length ? await readReplies(supabase, ids) : { data: [] as ReplyRow[], error: null };
   if (replies.error) return dbFailure(replies.error, "Could not load replies.");
 
   const names = await displayNames(supabase, [
@@ -388,12 +414,13 @@ export async function saveEvent(
 }
 
 export async function listMessages(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("id, sender_id, recipient_id, body, created_at, hidden_at")
-    .order("created_at", { ascending: true });
+  const read = (columns: string) => supabase.from("messages").select(columns).order("created_at", { ascending: true });
+  let { data, error } = await read("id, sender_id, recipient_id, body, created_at, hidden_at");
+  // hidden_at arrives with the moderation migration; read without it until then.
+  if (error && isMissingSchemaError(error))
+    ({ data, error } = await read("id, sender_id, recipient_id, body, created_at"));
   if (error) return dbFailure(error, "Could not load messages.");
-  const rows = (data ?? []).map((row) => ({
+  const rows = ((data ?? []) as unknown as MessageRow[]).map((row) => ({
     ...({
       id: row.id,
       senderId: row.sender_id,
