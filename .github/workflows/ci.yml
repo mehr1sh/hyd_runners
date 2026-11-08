@@ -64,7 +64,10 @@ jobs:
         env:
           # Opt-in for the scheduler API suite (uploads, planning, AI fallback).
           SCHEDULER_INTEGRATION: "1"
-        run: pnpm exec vitest run --reporter=default --reporter=json --outputFile.json=vitest-results.json
+        # The scheduler suite reads the Supabase settings from the environment.
+        run: |
+          set -a; . ./.env.local; set +a
+          pnpm exec vitest run --reporter=default --reporter=json --outputFile.json=vitest-results.json
       - name: Integration tests ran
         # Supabase-backed suites skip themselves when the stack or env is
         # missing. Fail instead of silently dropping the permission tests.
