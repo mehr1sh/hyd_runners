@@ -26,7 +26,9 @@ let ctx: Awaited<ReturnType<typeof import("@/features/dashboard/context").getRun
 vi.mock("@/features/dashboard/context", () => ({ getRunnerContext: async () => ctx }));
 
 const { loadDashboardState } = await import("@/features/dashboard/queries");
-const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
+const { default: DashboardRoute } = await import("@/app/(app)/dashboard/page");
+const DashboardPage = (searchParams: Record<string, string> = {}) =>
+  DashboardRoute({ params: Promise.resolve({}), searchParams: Promise.resolve(searchParams) });
 
 const TZ = "Asia/Kolkata";
 const COUCH_ID = "0547c1bc-2e00-51d2-8107-df7f55515630";
@@ -215,6 +217,18 @@ describe("DashboardPage (server render)", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Hello, Runner");
     expect(screen.getByRole("status")).toHaveTextContent("Your dashboard is not available yet.");
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+
+  it("confirms a completed password reset only for the known notice value", async () => {
+    client = fakeSupabase(completeRunnerTables());
+    ctx = makeCtx(client);
+    const { unmount } = render(await DashboardPage({ notice: "password-updated" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/password updated/i);
+    unmount();
+
+    render(await DashboardPage({ notice: "<script>alert(1)</script>" }));
+    expect(screen.queryByText(/password updated/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/script/)).not.toBeInTheDocument();
   });
 
   it("propagates unexpected database failures to the error boundary", async () => {
