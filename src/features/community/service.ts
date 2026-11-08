@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Role } from "@/lib/contracts";
 import { CommunityEvent, Location } from "@/lib/contracts";
-import { dbFailure, type ServiceResult } from "@/features/shared/db";
+import { dbFailure, profileNames, type ServiceResult } from "@/features/shared/db";
 import { isMissingSchemaError } from "@/lib/supabase/errors";
 import { canManageCommunity, hasAnyRole, MANAGER_ROLES } from "./logic/access";
 import { AnnouncementView, LocationUpdate, type DirectMessage } from "./logic/content";
@@ -160,13 +160,8 @@ function mapFeedback(row: {
   });
 }
 
-async function displayNames(supabase: SupabaseClient, ids: string[]) {
-  const unique = [...new Set(ids)];
-  const names = new Map<string, string>();
-  if (unique.length === 0) return names;
-  const { data } = await supabase.from("profiles").select("id, display_name").in("id", unique);
-  for (const row of data ?? []) names.set(row.id, row.display_name);
-  return names;
+function displayNames(supabase: SupabaseClient, ids: string[]) {
+  return profileNames(supabase, ids, "community");
 }
 
 export async function replyToFeedback(supabase: SupabaseClient, userId: string, feedbackId: string, body: string) {

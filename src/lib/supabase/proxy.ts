@@ -15,6 +15,8 @@ export const PROTECTED_PREFIXES = [
   "/clubs",
   "/runs",
   "/routes",
+  "/train",
+  "/explore",
   "/map",
   "/profile",
   "/coach",
