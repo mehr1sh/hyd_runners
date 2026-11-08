@@ -134,7 +134,13 @@ export function parseEventForm(formData: FormData) {
   const clubRaw = String(formData.get("clubId") ?? "");
   const clubId = clubRaw === "" ? null : z.uuid().safeParse(clubRaw);
   if (clubId !== null && !clubId.success) return { ok: false as const, message: "Club not found." };
-  return { ok: true as const, data: { ...parsed.data, ...extras.data, clubId: clubId?.data ?? null } };
+  const routeRaw = String(formData.get("routeId") ?? "");
+  const routeId = routeRaw === "" ? null : z.uuid().safeParse(routeRaw);
+  if (routeId !== null && !routeId.success) return { ok: false as const, message: "Route not found." };
+  return {
+    ok: true as const,
+    data: { ...parsed.data, ...extras.data, clubId: clubId?.data ?? null, routeId: routeId?.data ?? null },
+  };
 }
 
 export function parseMessageForm(formData: FormData) {

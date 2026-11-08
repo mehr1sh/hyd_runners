@@ -108,6 +108,7 @@ export function EventForm({
   event,
   locations,
   clubId,
+  routes = [],
 }: {
   event?: {
     id: string;
@@ -121,8 +122,11 @@ export function EventForm({
     category?: string;
     meetingPoint?: string | null;
     registrationClosesAt?: string | null;
+    routeId?: string | null;
   };
   locations: { id: string; name: string }[];
+  /** Published routes the event can follow. */
+  routes?: { id: string; name: string; distanceM: number }[];
   /** Creates the event for this club (club admins). */
   clubId?: string;
 }) {
@@ -211,6 +215,19 @@ export function EventForm({
             ))}
           </select>
         </Field>
+        {routes.length > 0 && (
+          <Field>
+            <FieldLabel htmlFor={`${idPrefix}-route`}>Route (optional)</FieldLabel>
+            <select id={`${idPrefix}-route`} name="routeId" defaultValue={event?.routeId ?? ""} className={selectClass}>
+              <option value="">No route</option>
+              {routes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({(r.distanceM / 1000).toFixed(1)} km)
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-closes`}>Registration closes (optional)</FieldLabel>
           <Input

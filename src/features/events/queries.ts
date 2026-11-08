@@ -6,7 +6,7 @@ import type { EventCategory, EventFilters, RsvpStatus, TeamRole } from "./logic"
 export const EVENT_PAGE_SIZE = 20;
 
 const EVENT_COLUMNS =
-  "id, title, description, starts_at, ends_at, location_id, capacity, status, created_by, category, meeting_point, registration_closes_at";
+  "id, title, description, starts_at, ends_at, location_id, capacity, status, created_by, category, meeting_point, registration_closes_at, route_id";
 
 export type EventRow = {
   id: string;
@@ -21,6 +21,7 @@ export type EventRow = {
   category: EventCategory;
   meetingPoint: string | null;
   registrationClosesAt: string | null;
+  routeId: string | null;
 };
 
 function toEvent(r: Record<string, unknown>): EventRow {
@@ -37,6 +38,7 @@ function toEvent(r: Record<string, unknown>): EventRow {
     category: r.category as EventCategory,
     meetingPoint: (r.meeting_point as string | null) ?? null,
     registrationClosesAt: r.registration_closes_at ? new Date(r.registration_closes_at as string).toISOString() : null,
+    routeId: (r.route_id as string | null) ?? null,
   };
 }
 
@@ -125,7 +127,7 @@ export async function getEventDetail(supabase: SupabaseClient, eventId: string, 
   if (!row) return null;
   const event = toEvent(row);
 
-  const [location, attendance, rsvps, position, paceGroups, updates, team, myTeam, result] = await Promise.all([
+  const [location, attendance, rsvps, position, paceGroups, updates, team, myTeam, result, route] = await Promise.all([
     event.locationId
       ? supabase
           .from("locations")
@@ -157,6 +159,13 @@ export async function getEventDetail(supabase: SupabaseClient, eventId: string, 
       .eq("event_id", event.id)
       .eq("user_id", userId)
       .maybeSingle(),
+    event.routeId
+      ? supabase
+          .from("routes")
+          .select("slug, name, distance_m, is_loop, route_geojson")
+          .eq("id", event.routeId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
   for (const [name, r] of [
     ["locations", location],
@@ -166,6 +175,7 @@ export async function getEventDetail(supabase: SupabaseClient, eventId: string, 
     ["event_team_members", team],
     ["event_team", myTeam],
     ["event_results", result],
+    ["routes", route],
   ] as const) {
     if (r.error) throw new DatabaseQueryError(name, r.error);
   }
@@ -193,6 +203,13 @@ export async function getEventDetail(supabase: SupabaseClient, eventId: string, 
       createdAt: new Date(u.created_at).toISOString(),
     })),
     team: (team.data ?? []) as { display_name: string; role: TeamRole; user_id: string | null }[],
+    route: route.data as {
+      slug: string;
+      name: string;
+      distance_m: number;
+      is_loop: boolean;
+      route_geojson: { type: "LineString"; coordinates: [number, number][] } | null;
+    } | null,
     result: result.data as { outcome: "finished" | "dnf" | "dns"; finish_seconds: number | null } | null,
     teamRole,
     canManage: isManager || teamRole === "organiser",

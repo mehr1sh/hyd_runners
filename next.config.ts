@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   // session read would otherwise need its own <Suspense> boundary. Revisit
   // before Next.js 17, where it becomes the default.
   cacheComponents: false,
+  experimental: {
+    // GPX route uploads go through a Server Action (2.5 MB file limit plus
+    // multipart overhead). Every other action stays far below this.
+    serverActions: { bodySizeLimit: "3mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {

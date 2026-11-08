@@ -412,6 +412,7 @@ export async function saveEvent(
     meetingPoint: string | null;
     registrationClosesAt: string | null;
     clubId?: string | null;
+    routeId?: string | null;
   },
 ) {
   const row = {
@@ -425,6 +426,7 @@ export async function saveEvent(
     category: input.category,
     meeting_point: input.meetingPoint,
     registration_closes_at: input.registrationClosesAt,
+    route_id: input.routeId ?? null,
   };
   if (input.id) {
     // Managers and the event's organisers may edit (RLS); zero rows means neither.
