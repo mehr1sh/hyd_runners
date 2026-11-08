@@ -50,7 +50,7 @@ export default async function CoachPage() {
           />
         )}
         {visibleFeedback ? (
-          <FeedbackPanel items={visibleFeedback} mode="coach" />
+          <FeedbackPanel items={visibleFeedback} mode="coach" viewerId={user.id} />
         ) : (
           data.feedback.ok === false && <p className="text-sm text-destructive">{data.feedback.message}</p>
         )}

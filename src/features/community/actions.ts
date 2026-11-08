@@ -16,6 +16,8 @@ import {
   parseMessageForm,
 } from "./logic/content";
 import { parseFeedbackForm, parseReplyForm } from "./logic/feedback";
+import { parseReportForm, parseResolutionForm } from "./logic/moderation";
+import { reportContent, resolveReport, viewReportedContent, type ReportedContent } from "./moderation";
 import {
   assignCoach,
   grantStaffRole,
@@ -185,6 +187,45 @@ export async function removeAssignmentAction(_prev: FormState, formData: FormDat
   if (!current.ok) return { status: "error", message: current.message };
   const saved = await removeAssignment(current.supabase, current.user.id, String(formData.get("assignmentId") ?? ""));
   return done(saved, "Assignment removed.", ["/manager", "/coach"]);
+}
+
+// ---------------------------------------------------------------------------
+// Reports and moderation
+// ---------------------------------------------------------------------------
+
+export async function reportContentAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const parsed = parseReportForm(formData);
+  if (!parsed.ok) return { status: "error", message: parsed.message };
+  const saved = await reportContent(current.supabase, parsed.data);
+  return done(saved, "Thanks. A moderator will review your report.", ["/community", "/coach", "/manager"]);
+}
+
+export type ReportedContentState =
+  { status: "idle" } | { status: "error"; message: string } | { status: "ok"; content: ReportedContent };
+
+/** Opens the reported item for a moderator. The database audits every call. */
+export async function viewReportedContentAction(
+  _prev: ReportedContentState,
+  formData: FormData,
+): Promise<ReportedContentState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const reportId = z.uuid().safeParse(formData.get("reportId"));
+  if (!reportId.success) return { status: "error", message: "Report not found." };
+  const result = await viewReportedContent(current.supabase, reportId.data);
+  if (!result.ok) return { status: "error", message: result.message };
+  return { status: "ok", content: result.data };
+}
+
+export async function resolveReportAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const parsed = parseResolutionForm(formData);
+  if (!parsed.ok) return { status: "error", message: parsed.message };
+  const saved = await resolveReport(current.supabase, parsed.data);
+  return done(saved, "Decision recorded.", ["/manager", "/community", "/coach"]);
 }
 
 // ---------------------------------------------------------------------------
