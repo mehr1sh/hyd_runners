@@ -66,7 +66,8 @@ describe("recorded activity conversion", () => {
     expect(a.distanceMeters).toBeGreaterThan(2690);
     expect(a.distanceMeters).toBeLessThan(2710);
     expect(a.elapsedSeconds).toBe(900);
-    expect(a.movingSource).toBe("derived");
+    expect(a.movingSource).toBe("device");
+    expect(a.movingSeconds).toBe(900);
     expect(a.kmSplits.filter((s) => !s.partial)).toHaveLength(2);
     expect(a.bestEfforts["1k"]).toBeGreaterThan(330);
   });

@@ -63,9 +63,9 @@ export function mergePauses(pauses: { from: string; to: string }[]): [number, nu
  * Convert an app recording into a ParsedActivity.
  *
  * - Fixes worse than MAX_RECORDED_ACCURACY_M and fixes inside a pause are dropped.
- * - When the runner paused, moving time is the timer time (elapsed minus the
- *   pauses inside the track), reported as "device" like a watch's FIT timer.
- *   Without pauses the normaliser derives moving time from speed.
+ * - Moving time is the app's timer time (elapsed minus the pauses inside the
+ *   track), reported as "device" like a watch's FIT timer, so the web shows
+ *   the same moving time the runner saw in the app.
  */
 export function recordedToParsed(input: RecordedActivityInput): ParsedActivity {
   const pauses = mergePauses(input.pauses);
@@ -85,15 +85,12 @@ export function recordedToParsed(input: RecordedActivityInput): ParsedActivity {
     .sort((a, b) => a.t - b.t);
   if (samples.length < 2) throw new ActivityValidationError("The recording has too few accurate GPS points.");
 
-  let deviceMovingSeconds: number | null = null;
-  if (pauses.length > 0) {
-    const start = samples[0].t;
-    const end = samples[samples.length - 1].t;
-    let paused = 0;
-    for (const [from, to] of pauses) paused += Math.max(0, Math.min(to, end) - Math.max(from, start));
-    const timer = Math.round((end - start - paused) / 1000);
-    deviceMovingSeconds = timer > 0 ? timer : null;
-  }
+  const start = samples[0].t;
+  const end = samples[samples.length - 1].t;
+  let paused = 0;
+  for (const [from, to] of pauses) paused += Math.max(0, Math.min(to, end) - Math.max(from, start));
+  const timer = Math.round((end - start - paused) / 1000);
+  const deviceMovingSeconds = timer > 0 ? timer : null;
 
   return {
     format: "app",
