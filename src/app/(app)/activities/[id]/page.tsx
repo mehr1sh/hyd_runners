@@ -18,6 +18,9 @@ import { formatDateTime } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { formatDuration } from "@/features/events/logic";
 import { ElevationProfile } from "@/features/routes/components/elevation-profile";
+import { cardDate } from "@/features/share/logic";
+import { CommentForm, ReportForm, SocialButton } from "@/features/social/components/social-forms";
+import { activitySocial, getRunnerProfile } from "@/features/social/queries";
 
 export const metadata: Metadata = { title: "Activity" };
 
@@ -83,13 +86,34 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
   const pacing = pacingAnalysis(a.kmSplits);
   const matches = own && a.hasGps ? await routeMatches(ctx.supabase, a.id) : [];
   const others = matches.filter((m) => m.activityId !== a.id);
+  const [social, author] = await Promise.all([
+    activitySocial(ctx.supabase, a.id, ctx.user.id),
+    own ? Promise.resolve(null) : getRunnerProfile(ctx.supabase, a.userId),
+  ]);
   const fastest = splits
     .filter((s) => !s.partial)
     .reduce<number | null>((m, s) => (m === null || s.pace < m ? s.pace : m), null);
 
   return (
     <>
-      <PageHeader title={title} description={a.startedAt ? formatDateTime(a.startedAt, ctx.timezone) : undefined} />
+      <PageHeader
+        title={title}
+        description={
+          own
+            ? a.startedAt
+              ? formatDateTime(a.startedAt, ctx.timezone)
+              : undefined
+            : // Others see the date only: start times reveal routines.
+              `${author ? `By ${author.displayName} · ` : ""}${a.startedAt ? cardDate(a.startedAt) : ""}`
+        }
+      />
+      {!own && author && (
+        <p className="-mt-4 mb-4 text-sm">
+          <Link href={`/runners/${author.id}`} className="underline underline-offset-4">
+            View {author.displayName}&apos;s profile
+          </Link>
+        </p>
+      )}
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           {line && <RouteMap label={`Map of ${title}`} lines={[{ id: a.id, name: title, coordinates: line }]} />}
@@ -220,6 +244,56 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
               </ul>
             )}
             <p className="text-xs text-muted-foreground">Measured from your GPS track, not an official race result.</p>
+          </section>
+          <section className="space-y-3 rounded-xl border bg-card p-4 text-sm" aria-labelledby="social">
+            <h2 id="social" className="font-semibold text-brand-navy">
+              Kudos and comments
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <span>{social.kudos} kudos</span>
+              {!own &&
+                (social.myKudos ? (
+                  <SocialButton intent="unkudos" fields={{ activityId: a.id }} label="Remove kudos" />
+                ) : (
+                  <SocialButton intent="kudos" fields={{ activityId: a.id }} label="Give kudos" variant="default" />
+                ))}
+            </div>
+            {social.comments.length > 0 && (
+              <ul aria-label="Comments" className="space-y-3">
+                {social.comments.map((c) => (
+                  <li key={c.id} className="space-y-1 border-t pt-2">
+                    <p className="text-xs text-muted-foreground">
+                      {c.authorId === ctx.user.id ? "You" : (c.authorName ?? "A runner")} · {cardDate(c.createdAt)}
+                      {c.hidden ? " · hidden by a moderator" : ""}
+                    </p>
+                    <p className="whitespace-pre-wrap">{c.body}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(c.authorId === ctx.user.id || own) && (
+                        <SocialButton
+                          intent="delete_comment"
+                          fields={{ commentId: c.id, activityId: a.id }}
+                          label="Delete"
+                          variant="ghost"
+                          confirm="Delete this comment?"
+                        />
+                      )}
+                      {c.authorId !== ctx.user.id && (
+                        <ReportForm
+                          targetType="activity_comment"
+                          targetId={c.id}
+                          activityId={a.id}
+                          label="Report comment"
+                        />
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {(own || a.visibility !== "private") && <CommentForm activityId={a.id} />}
+            {!own && (
+              <ReportForm targetType="activity" targetId={a.id} activityId={a.id} label="Report this activity" />
+            )}
           </section>
           <section className="space-y-1 rounded-xl border bg-card p-4 text-sm">
             <Badge variant="secondary">{a.format?.toUpperCase()} import</Badge>

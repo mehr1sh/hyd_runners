@@ -14,6 +14,8 @@ const ROUTES = [
   "/community",
   "/events",
   "/map",
+  "/feed",
+  "/runners",
   "/conditions",
   "/profile",
   "/coach",
