@@ -30,6 +30,7 @@ const KIND_LABEL = {
   missed_session: "Missed session",
   adaptive: "Adaptive adjustment",
   coach: "From your coach",
+  return_to_run: "Return to running",
 } as const;
 const STATUS_LABEL = {
   proposed: "Waiting for you",
@@ -149,10 +150,13 @@ export default async function TrainingPage() {
                     changes={p.changes.map((c, i) => ({
                       index: i + 1,
                       label: c.label,
-                      group: p.kind === "race_plan" ? (c.label.split(",")[0] ?? "Sessions") : "Changes",
+                      group:
+                        p.kind === "race_plan" || p.kind === "return_to_run"
+                          ? (c.label.split(",")[0] ?? "Sessions")
+                          : "Changes",
                     }))}
                   />
-                  {p.kind === "race_plan" && (
+                  {(p.kind === "race_plan" || p.kind === "return_to_run") && (
                     <p className="text-xs text-muted-foreground">
                       A generated recommendation, not a prescription. Untick any session you don&apos;t want; you can
                       move sessions later in your schedule.

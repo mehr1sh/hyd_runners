@@ -492,6 +492,7 @@ const COMPOSERS: Record<Exclude<Intent, "safety">, Composer> = {
   },
 
   recovery(d, b) {
+    b.link("/recovery", "Recovery journal");
     const week = d.recovery.filter((r) => r.date >= addDays(d.today, -6));
     const runDays = new Set(d.runs.filter((r) => r.localDate >= addDays(d.today, -6)).map((r) => r.localDate)).size;
     const rest = b.fact("rest_days_7", "Days without a run (last 7)", String(7 - runDays));

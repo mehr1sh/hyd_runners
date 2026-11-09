@@ -40,6 +40,8 @@ export const RUNNER_NAV: NavItem[] = [
       "/reports",
       "/hyd-coach",
       "/training",
+      "/recovery",
+      "/strength",
     ],
   },
   {
@@ -74,6 +76,8 @@ export const SECTION_TABS: { section: string; tabs: { href: string; label: strin
       { href: "/activities", label: "Activities" },
       { href: "/performance", label: "Performance" },
       { href: "/reports", label: "Reports" },
+      { href: "/recovery", label: "Recovery" },
+      { href: "/strength", label: "Strength" },
     ],
   },
   {
