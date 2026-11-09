@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
@@ -7,6 +7,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["tests/unit/**/*.test.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+    // The Expo app runs its own vitest (pnpm --dir mobile test).
+    exclude: [...configDefaults.exclude, "mobile/**"],
     setupFiles: ["tests/setup.ts"],
     coverage: { provider: "v8", include: ["src/lib/**", "src/features/**"] },
   },
