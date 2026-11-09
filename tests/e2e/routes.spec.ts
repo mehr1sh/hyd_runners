@@ -79,6 +79,22 @@ test("a manager uploads and verifies a route; runners review it and report condi
   await signInAs(page, emails.runner);
   await page.goto("/routes?beginner=1");
   await expect(page.getByRole("region", { name: "Map of routes" })).toBeVisible();
+  await expect(page.getByRole("link", { name })).toBeVisible();
+
+  // Natural-language search becomes visible, removable typed filters.
+  await page.goto("/routes");
+  await page.getByLabel("Describe the run you want").fill(`beginner friendly loop under 2 km ${stamp}`);
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByText(/We searched for: up to 2 km · loop · suits beginners · matching/)).toBeVisible();
+  const active = page.getByRole("list", { name: "Active filters" });
+  await expect(active).toContainText("Up to 2 km");
+  await expect(page.getByRole("list", { name: "Routes" }).getByRole("link")).toHaveText([name]);
+  await active.getByRole("link", { name: "Remove filter: Loop" }).click();
+  await expect(page).not.toHaveURL(/loop=1/);
+  await expect(page.getByRole("list", { name: "Routes" }).getByRole("link", { name })).toBeVisible();
+  await page.goto(`/routes?text=${encodeURIComponent(stamp)}&min=5`);
+  await expect(page.getByText("No routes match")).toBeVisible();
+  await page.goto(`/routes?text=${encodeURIComponent(stamp)}`);
   await page.getByRole("link", { name }).click();
   await expect(page).toHaveURL(new RegExp(`${routePath}$`));
   await page.getByLabel("Overall (1–5)").selectOption("5");

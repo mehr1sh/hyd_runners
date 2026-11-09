@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ageLabel,
-  elevationStats,
-  formatDistance,
-  parseAttributes,
-  parseGpx,
-  parseRouteFilters,
-  toWkt,
-} from "@/features/routes/logic";
+import { ageLabel, elevationStats, formatDistance, parseAttributes, parseGpx, toWkt } from "@/features/routes/logic";
 
 const gpx = (pts: string) =>
   `<?xml version="1.0"?><gpx version="1.1" creator="test"><trk><trkseg>${pts}</trkseg></trk></gpx>`;
@@ -87,16 +79,6 @@ describe("formatting and forms", () => {
     expect(parseAttributes(new FormData())).toMatchObject({
       ok: true,
       data: { surface: "unknown", beginnerSuitable: null, waterRefill: null, parking: null },
-    });
-  });
-
-  it("parses route filters", () => {
-    expect(parseRouteFilters({ beginner: "1", loop: "0", min: "3", max: "500" })).toEqual({
-      beginner: true,
-      loop: false,
-      verified: false,
-      minKm: 3,
-      maxKm: null,
     });
   });
 });
