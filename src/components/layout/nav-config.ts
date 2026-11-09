@@ -86,6 +86,7 @@ export const SECTION_TABS: { section: string; tabs: { href: string; label: strin
       { href: "/explore", label: "Overview" },
       { href: "/routes", label: "Routes" },
       { href: "/runs", label: "Group runs" },
+      { href: "/runs/radar", label: "Run Radar" },
       { href: "/map", label: "Places" },
       { href: "/conditions", label: "Conditions" },
     ],

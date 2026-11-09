@@ -127,11 +127,15 @@ export function SectionTabs() {
   const pathname = usePathname();
   const tabs = sectionTabsFor(pathname);
   if (!tabs) return null;
+  // Only the most specific matching tab is current (e.g. /runs/radar, not /runs).
+  const current = tabs
+    .filter((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <nav aria-label="Section" className="mb-6 max-w-full overflow-x-auto">
       <ul className="flex gap-1 border-b">
         {tabs.map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          const active = tab.href === current;
           return (
             <li key={tab.href}>
               <Link
