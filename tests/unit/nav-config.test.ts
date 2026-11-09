@@ -27,6 +27,7 @@ describe("navigation", () => {
   it("shows section tabs only inside sections", () => {
     expect(sectionTabsFor("/schedule")?.map((t) => t.label)).toEqual([
       "Overview",
+      "HYD Coach",
       "Schedule",
       "Programmes",
       "Workouts",

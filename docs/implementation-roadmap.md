@@ -41,41 +41,51 @@ Release 1 is sequenced in this order:
 | G. Route search                   | Production verified (schema), 2026-11-09                | #23 `64280cd`, `20261117120000_route_search`. Dry run 42604561978, apply 42604658715, verify 42604795326. Typed `search_routes()` (caller's rights, validated parameters) with text, near-a-place radius, distance, attributes, facilities, rating, open-report and sort filters; deterministic plain-English parser that only fills whitelisted filters, no SQL generation, no external service. See [route-search.md](route-search.md) |
 | H. Social v1                      | Production verified (schema), 2026-11-09                | #27 `25434f6`, `20261118120000_social_v1`. Dry run 42608017296, apply 42608115992, verify 42608219451. Follows with approval by default, followers-only visibility, blocks both ways, kudos, comments, feed, minimal runner profiles and opt-out search, reports and moderator hiding through the existing workflow; see [social.md](social.md)                                                                                          |
 
-## Release 3: HYD Coach
+## Release 3: final product release
 
-| Workstream             | Status      | Notes                                     |
-| ---------------------- | ----------- | ----------------------------------------- |
-| A. Coach Q&A           | Not started | Answers must come from database summaries |
-| B. Adaptive training   | Not started | Reuses the planner's approval flow        |
-| C. Race and pace tools | Not started | Predictions are labelled as estimates     |
-| D. Recovery journal    | Not started | Makes no medical claims                   |
-| E. Human coach tools   | Not started | Builds on Release 0 access rules          |
+Release 3 completes the product. It follows the original Release 3 and 4 plan and builds on what Release 2 shipped (reconciled against `main` at `62fc980` on 2026-11-09: all eight Release 2 workstreams merged, five migrations applied with no drift). It is built in dependency order, one PR per workstream.
 
-## Release 4: the wider running ecosystem
+**Verification labels:**
 
-| Workstream                               | Status                         | Notes                                                                             |
-| ---------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------- |
-| A. Runner matching and squads            | Not started                    |                                                                                   |
-| B. Live group runs                       | Not started                    | Location sharing is opt-in and time-limited; reliable tracking needs a native app |
-| C. Leagues                               | Not started                    |                                                                                   |
-| D. Race Passport                         | Not started                    |                                                                                   |
-| E. Event management platform             | Not started                    | Payments are not enabled without separate authorisation                           |
-| F. Health and wearable integration       | Blocked by external dependency | Needs a native app and Strava API approval                                        |
-| G. Coach and physiotherapist marketplace | Not started                    | Architecture only; transactions need separate approval                            |
+- **Production verified:** deployed, and the production behaviour was checked.
+- **CI/local verified:** automated tests passed in CI and locally.
+- **Staging only:** nothing yet; there is no separate staging project.
+- **Externally configured:** waiting for an owner account, credentials or approval.
+- **Unverified:** not tested.
+
+Signed-in production flows are not tested, because that would need production test accounts.
+
+| Workstream                                | Status      | Notes                                                                                           |
+| ----------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| A. HYD Coach                              | In progress | Answers come from the runner's own data; AI may only rephrase; see [hyd-coach.md](hyd-coach.md) |
+| B. Adaptive training and race preparation | Not started | Reuses the planner's approval flow                                                              |
+| C. Recovery and strength                  | Not started | Makes no medical claims                                                                         |
+| D. Human coach platform                   | Not started | Builds on Release 0 assignment rules                                                            |
+| E. Runner matching and squads             | Not started |                                                                                                 |
+| F. Advanced group runs and live tracking  | Not started | Location sharing is opt-in and time-limited                                                     |
+| G. Leagues                                | Not started |                                                                                                 |
+| H. Race Passport                          | Not started |                                                                                                 |
+| I. Wearable and health integrations       | Not started | Strava needs API approval; Health Connect and HealthKit need the native app                     |
+| J. Native mobile companion                | Not started | Store release needs owner developer accounts                                                    |
+| K. Coach and physiotherapist marketplace  | Not started | Real payments stay disabled                                                                     |
+| L. Visual and storytelling features       | Not started |                                                                                                 |
+| M. Experimental running experiences       | Not started |                                                                                                 |
+| N. Final integration and QA               | Not started |                                                                                                 |
 
 ## Dependency register
 
-| Dependency                        | Needed for                         | Status                                        | Production configuration                                                    |
-| --------------------------------- | ---------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------- |
-| SMTP provider                     | Password reset, invites, reminders | Owner action                                  | Supabase → Authentication → SMTP settings                                   |
-| Weather and AQI provider          | Release 2 C                        | Research pending                              | Server-only API key; variable name to be decided                            |
-| Map tiles                         | All maps                           | OpenStreetMap tile servers, under OSMF policy | `NEXT_PUBLIC_MAP_TILE_URL`. Heavier use needs a commercial tile provider    |
-| Elevation data                    | Routes                             | Research pending                              |                                                                             |
-| AI provider                       | Release 3                          | Gemini adapter exists                         | `AI_PROVIDER`, `GEMINI_API_KEY` (server-only)                               |
-| Strava API                        | Release 4 F                        | Needs API approval                            |                                                                             |
-| Health Connect and HealthKit      | Release 4 F                        | Needs a native app                            |                                                                             |
-| Payment provider                  | Release 4 E and G                  | Needs separate review                         |                                                                             |
-| Vercel Preview Supabase variables | Signed-in preview testing          | Owner action                                  | Preview: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| Dependency                        | Needed for                               | Status                                                                        | Production configuration                                                                                                                  |
+| --------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| SMTP provider                     | Password reset, invites, reminders       | Owner action                                                                  | Supabase → Authentication → SMTP settings                                                                                                 |
+| Weather provider                  | Release 2 C, Release 3 A and B           | MET Norway, in use (no account, commercial use allowed, attributed)           | `CONDITIONS_PROVIDER` (default `met_norway`; `sample` for tests)                                                                          |
+| Air-quality provider              | Release 2 C                              | Owner decision: no free, account-free source allows commercial use            | Options and licences in [run-conditions.md](run-conditions.md)                                                                            |
+| Map tiles                         | All maps                                 | OpenStreetMap tile servers, under OSMF policy                                 | `NEXT_PUBLIC_MAP_TILE_URL`. Heavier use needs a commercial tile provider                                                                  |
+| Elevation data                    | Routes                                   | Not needed: elevation comes only from uploaded GPX/FIT files, never estimated | none                                                                                                                                      |
+| AI provider                       | Release 3 A (optional phrasing), planner | Gemini adapter exists; every AI feature works without it                      | `AI_PROVIDER`, `GEMINI_API_KEY`, `AI_DAILY_CALL_LIMIT` (server-only). Whether Production has a key set is not visible from the repository |
+| Strava API                        | Release 3 I                              | Needs API approval                                                            |                                                                                                                                           |
+| Health Connect and HealthKit      | Release 3 I                              | Needs a native app                                                            |                                                                                                                                           |
+| Payment provider                  | Release 3 H and K                        | Needs separate review                                                         |                                                                                                                                           |
+| Vercel Preview Supabase variables | Signed-in preview testing                | Owner action                                                                  | Preview: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                                                               |
 
 ## UX debt
 

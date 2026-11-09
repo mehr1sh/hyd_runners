@@ -218,10 +218,13 @@ export async function aiCallsInLastDay(supabase: SupabaseClient): Promise<number
 export async function recordAiCall(
   supabase: SupabaseClient,
   call: {
-    feature: "timetable_extraction" | "schedule_suggestion";
+    feature: "timetable_extraction" | "schedule_suggestion" | "hyd_coach";
     outcome: "success" | "failed" | "rejected";
     errorKind?: string | null;
     latencyMs?: number | null;
+    model?: string | null;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
   },
 ) {
   const { error } = await supabase.from("ai_calls").insert({
@@ -229,6 +232,9 @@ export async function recordAiCall(
     outcome: call.outcome,
     error_kind: call.errorKind ?? null,
     latency_ms: call.latencyMs ?? null,
+    model: call.model ?? null,
+    input_tokens: call.inputTokens ?? null,
+    output_tokens: call.outputTokens ?? null,
   });
   // Usage records must not break the runner's request.
   if (error) console.warn(`[scheduler] could not record AI usage: ${error.code}`);

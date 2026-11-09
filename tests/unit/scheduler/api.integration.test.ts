@@ -450,8 +450,20 @@ describe.skipIf(!enabled)("scheduler API (integration)", () => {
     it("records AI usage without storing content", async () => {
       const { data } = await a.admin.from("ai_calls").select("*").eq("user_id", a.id);
       expect(data!.length).toBeGreaterThanOrEqual(2);
+      // Usage metadata only (model name and token counts are numbers, not content).
       expect(Object.keys(data![0]).sort()).toEqual(
-        ["created_at", "error_kind", "feature", "id", "latency_ms", "outcome", "user_id"].sort(),
+        [
+          "created_at",
+          "error_kind",
+          "feature",
+          "id",
+          "input_tokens",
+          "latency_ms",
+          "model",
+          "outcome",
+          "output_tokens",
+          "user_id",
+        ].sort(),
       );
     });
   });
