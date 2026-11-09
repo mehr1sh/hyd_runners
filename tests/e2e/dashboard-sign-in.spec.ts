@@ -61,6 +61,13 @@ test.describe("dashboard after sign-in", () => {
     await expectHealthyDashboard(page, consoleErrors, "Hello, Asha Rao");
     await expect(page.getByText("Nothing planned yet")).toBeVisible();
     await expect(page.getByText("0 XP", { exact: true })).toBeVisible();
+    // Release 2 panels, with honest empty states; tests use labelled sample weather.
+    await expect(page.getByRole("heading", { name: "Run now or later?" })).toBeVisible();
+    await expect(page.getByText("Sample data", { exact: true })).toBeVisible();
+    await expect(page.getByText("No imported activities this week.")).toBeVisible();
+    await expect(page.getByText("Import a GPX or FIT file from your watch or phone.")).toBeVisible();
+    await expect(page.getByText("You haven’t joined a city or club challenge.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Hourly forecast" })).toHaveAttribute("href", "/conditions");
   });
 
   test("a runner without a profile or role row still gets a working dashboard", async ({ page }, testInfo) => {
