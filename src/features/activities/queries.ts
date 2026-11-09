@@ -17,7 +17,7 @@ export type Activity = {
   privacyTrimM: number;
   status: "uploaded" | "processing" | "ready" | "failed";
   failureReason: string | null;
-  format: "gpx" | "fit" | null;
+  format: "gpx" | "fit" | "app" | null;
   startedAt: string | null;
   endedAt: string | null;
   elapsedSeconds: number | null;

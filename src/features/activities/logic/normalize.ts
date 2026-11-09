@@ -31,7 +31,7 @@ export type RawSample = {
 export type ActivityType = "run" | "walk_run" | "walk" | "hike";
 
 export type ParsedActivity = {
-  format: "gpx" | "fit";
+  format: "gpx" | "fit" | "app";
   samples: RawSample[];
   /** From the file (FIT sport / GPX type), if recognisable. */
   detectedType: ActivityType | null;
