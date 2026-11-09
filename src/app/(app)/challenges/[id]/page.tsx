@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ShareCardPanel } from "@/features/share/components/share-card-panel";
+import { safeFilename } from "@/features/share/logic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -84,6 +86,19 @@ export default async function ChallengePage({ params }: PageProps<"/challenges/[
                   {p.completedAt ? " · completed ✓" : ""}
                 </p>
               )}
+            </section>
+          )}
+          {p?.completedAt && (
+            <section className="space-y-2 rounded-xl border bg-card p-4" aria-labelledby="share">
+              <h2 id="share" className="font-semibold text-brand-navy">
+                Share your achievement
+              </h2>
+              <ShareCardPanel
+                endpoint={`/api/v1/challenges/${c.id}/card`}
+                filename={safeFilename(c.title)}
+                canHideRoute={false}
+                canHidePace={false}
+              />
             </section>
           )}
           {!ended && c.status === "active" && (
