@@ -22,6 +22,8 @@ const ROUTES = [
   "/recovery",
   "/strength",
   "/notifications",
+  "/matching",
+  "/squads",
   "/profile",
   "/coach",
   "/manager",
