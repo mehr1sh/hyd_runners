@@ -85,9 +85,10 @@ reset role;
 -- one 3-minute jog that never counts, and one log created long after a window would close.
 select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', now() - interval '6 days', 40, 7000);
 select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', now() - interval '5 days', 30, 5000);
-select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', now() - interval '4 days', 30, 5000);
-select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', now() - interval '4 days' + interval '2 hours', 30, 5000);
-select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', now() - interval '4 days' + interval '4 hours', 30, 5000);
+-- Three logs on one local day (fixed hours, so they never straddle midnight in Asia/Kolkata).
+select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', (((now() at time zone 'Asia/Kolkata')::date - 4) + time '08:00') at time zone 'Asia/Kolkata', 30, 5000);
+select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', (((now() at time zone 'Asia/Kolkata')::date - 4) + time '10:00') at time zone 'Asia/Kolkata', 30, 5000);
+select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', (((now() at time zone 'Asia/Kolkata')::date - 4) + time '12:00') at time zone 'Asia/Kolkata', 30, 5000);
 select pg_temp.log('ad000000-0000-4000-8000-0000000000a1', now() - interval '3 days', 3, 600);
 select pg_temp.log('ad000000-0000-4000-8000-0000000000a1',
                    ((current_date - 2) + time '06:15') at time zone 'Asia/Kolkata', 45, 8000);
