@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Local agent worktrees (never committed).
     ".claude/worktrees/**",
+    // The Expo app is a separate package with its own checks (pnpm --dir mobile typecheck/test).
+    "mobile/**",
   ]),
 ]);
 

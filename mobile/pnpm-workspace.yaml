@@ -1,0 +1,3 @@
+# The mobile app is its own pnpm project (separate lockfile), not part of the
+# web app's install. React Native / Metro expects a flat node_modules.
+nodeLinker: hoisted
