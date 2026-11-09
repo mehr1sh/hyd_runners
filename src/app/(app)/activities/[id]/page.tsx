@@ -296,7 +296,9 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
             )}
           </section>
           <section className="space-y-1 rounded-xl border bg-card p-4 text-sm">
-            <Badge variant="secondary">{a.format?.toUpperCase()} import</Badge>
+            <Badge variant="secondary">
+              {a.format === "app" ? "Recorded in the app" : `${a.format?.toUpperCase()} import`}
+            </Badge>
             {a.workoutLogId && <p className="text-muted-foreground">Counted once in your workouts and rewards.</p>}
           </section>
           {own && (
