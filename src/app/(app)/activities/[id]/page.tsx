@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { ActivitySettings } from "@/features/activities/components/activity-settings";
 import { ACTIVITY_TYPE_LABEL, duration, km, pace } from "@/features/activities/logic/format";
 import { PR_DISTANCES } from "@/features/activities/logic/normalize";
+import { pacingAnalysis } from "@/features/activities/logic/performance";
+import { routeMatches } from "@/features/activities/performance-queries";
 import { getActivity } from "@/features/activities/queries";
 import { getRunnerContext } from "@/features/dashboard/context";
 import { formatDateTime } from "@/features/dashboard/format";
@@ -76,6 +78,9 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
     stats.push(["Average heart rate", `${track.avgHeartRate} bpm (max ${track.maxHeartRate})`]);
   if (own && track?.avgCadence) stats.push(["Average cadence", `${track.avgCadence} spm`]);
   const splits = a.kmSplits ?? [];
+  const pacing = pacingAnalysis(a.kmSplits);
+  const matches = own && a.hasGps ? await routeMatches(ctx.supabase, a.id) : [];
+  const others = matches.filter((m) => m.activityId !== a.id);
   const fastest = splits
     .filter((s) => !s.partial)
     .reduce<number | null>((m, s) => (m === null || s.pace < m ? s.pace : m), null);
@@ -132,8 +137,71 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
               </table>
             </section>
           )}
+          {own && others.length > 0 && (
+            <section className="space-y-2" aria-labelledby="same-route">
+              <h2 id="same-route" className="font-semibold text-brand-navy">
+                Same route, other days
+              </h2>
+              <table className="w-full text-sm">
+                <caption className="sr-only">Your activities on the same route</caption>
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="py-1">Date</th>
+                    <th>Distance</th>
+                    <th>Time</th>
+                    <th>Pace</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matches.map((m) => (
+                    <tr
+                      key={m.activityId}
+                      className={`border-t ${m.activityId === a.id ? "font-semibold text-brand-navy" : ""}`}
+                    >
+                      <td className="py-1">
+                        {m.activityId === a.id ? (
+                          "This run"
+                        ) : (
+                          <Link href={`/activities/${m.activityId}`} className="underline underline-offset-4">
+                            {formatDateTime(m.startedAt, ctx.timezone).split(",")[0]}
+                          </Link>
+                        )}
+                      </td>
+                      <td>{km(m.distanceM)}</td>
+                      <td>{duration(m.movingSeconds)}</td>
+                      <td>{pace(m.avgPace)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-muted-foreground">
+                Matched when both ends are within 200 m, the distance is within 5% and the paths never stray more than
+                about 120 m apart.
+              </p>
+            </section>
+          )}
         </div>
         <aside className="space-y-4">
+          {pacing && (
+            <section className="space-y-1 rounded-xl border bg-card p-4 text-sm" aria-labelledby="pacing">
+              <h2 id="pacing" className="font-semibold text-brand-navy">
+                Pacing
+              </h2>
+              <p>
+                {pacing.kind === "negative"
+                  ? "Negative split: your second half was faster."
+                  : pacing.kind === "positive"
+                    ? "Positive split: your second half was slower."
+                    : "Even split: both halves at about the same pace."}
+              </p>
+              <p className="text-muted-foreground">
+                First half {pace(pacing.firstHalfPace)}, second half {pace(pacing.secondHalfPace)} (
+                {pacing.diffPct > 0 ? "+" : ""}
+                {pacing.diffPct}%). Split paces were {pacing.consistency} (varying by {pacing.variationPct}%). Fastest
+                km {pacing.fastest.index}, slowest km {pacing.slowest.index}.
+              </p>
+            </section>
+          )}
           <section className="space-y-2 rounded-xl border bg-card p-4 text-sm" aria-labelledby="efforts">
             <h2 id="efforts" className="font-semibold text-brand-navy">
               Best efforts in this activity
