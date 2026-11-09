@@ -145,20 +145,18 @@ export type SquadDashboard = {
 };
 
 export async function squadDetail(supabase: SupabaseClient, squadId: string, userId: string) {
-  const [squad, roster, dash, messages, runs, attendance] = await Promise.all([
+  const [squad, roster, mine, dash, messages, runs, attendance] = await Promise.all([
     supabase
       .from("squads")
       .select("id, name, description, weekly_km_target, join_policy, max_members")
       .eq("id", squadId)
       .maybeSingle(),
-    supabase
-      .from("squad_members")
-      .select("user_id, role, status, profiles!squad_members_user_id_fkey(display_name)")
-      .eq("squad_id", squadId),
+    supabase.rpc("squad_people", { p_squad: squadId }),
+    supabase.from("squad_members").select("role, status").eq("squad_id", squadId).eq("user_id", userId).maybeSingle(),
     supabase.rpc("squad_dashboard", { p_squad: squadId }),
     supabase
       .from("squad_messages")
-      .select("id, author_id, body, created_at, hidden_at, author:profiles!squad_messages_author_id_fkey(display_name)")
+      .select("id, author_id, body, created_at, hidden_at")
       .eq("squad_id", squadId)
       .order("created_at", { ascending: false })
       .limit(50),
@@ -172,13 +170,15 @@ export async function squadDetail(supabase: SupabaseClient, squadId: string, use
   ]);
   const s = check("squads", squad) as Record<string, unknown> | null;
   if (!s) return null;
-  const members = (check("squad_members", roster) as Record<string, unknown>[]).map((m) => ({
+  const members = (check("squad_people", roster) as Record<string, unknown>[]).map((m) => ({
     userId: m.user_id as string,
     role: m.role as string,
     status: m.status as string,
-    name: ((m.profiles as { display_name?: string } | null)?.display_name as string | undefined) ?? "A runner",
+    name: (m.display_name as string | null) ?? "A runner",
   }));
-  const me = members.find((m) => m.userId === userId);
+  const nameById = new Map(members.map((m) => [m.userId, m.name]));
+  const own = mine.data as { role: string; status: string } | null;
+  const me = own ? { userId, role: own.role, status: own.status, name: nameById.get(userId) ?? "You" } : null;
   return {
     id: s.id as string,
     name: s.name as string,
@@ -186,7 +186,7 @@ export async function squadDetail(supabase: SupabaseClient, squadId: string, use
     weeklyKmTarget: s.weekly_km_target === null ? null : Number(s.weekly_km_target),
     joinPolicy: s.join_policy as "invite_only" | "request",
     maxMembers: Number(s.max_members),
-    me: me ?? null,
+    me,
     members,
     dashboard: dash.error ? null : (dash.data as SquadDashboard),
     messages: (messages.error ? [] : (messages.data as Record<string, unknown>[])).map((m) => ({
@@ -195,7 +195,7 @@ export async function squadDetail(supabase: SupabaseClient, squadId: string, use
       body: m.body as string,
       createdAt: m.created_at as string,
       hidden: Boolean(m.hidden_at),
-      author: ((m.author as { display_name?: string } | null)?.display_name as string | undefined) ?? "A runner",
+      author: nameById.get(m.author_id as string) ?? "Former member",
     })),
     runs: (runs.error ? [] : (runs.data as Record<string, unknown>[])).map((r) => ({
       id: r.id as string,

@@ -95,6 +95,9 @@ test("runners opt into matching, form a squad and run it together", async ({ pag
   await signInAs(page, emails.a);
   await page.goto(squadUrl);
   await expect(page.getByRole("list", { name: "Squad messages" })).toContainText("Saturday 6am at the gate?");
+  await expect(page.getByRole("list", { name: "Squad messages" })).toContainText(names.b);
+  await expect(page.getByRole("region", { name: /Members \(2 of 6\)/ })).toContainText(names.b);
+  await expect(page.getByRole("region", { name: "This week together" })).toContainText(names.b);
   await expect(page.getByRole("region", { name: "This week together" })).toContainText("of 20 km target");
 
   const { data: outsider } = await admin.auth.admin.createUser({

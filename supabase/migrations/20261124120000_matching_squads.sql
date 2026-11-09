@@ -287,6 +287,24 @@ $$;
 revoke all on function public.create_squad(text, text, numeric, text, integer), public.squad_membership(uuid, uuid, text) from public, anon;
 grant execute on function public.create_squad(text, text, numeric, text, integer), public.squad_membership(uuid, uuid, text) to authenticated;
 
+-- Names of a squad's people for its members (profiles are not readable
+-- across runners). Members see everyone in the squad, including pending
+-- invites and requests; everyone else sees nothing.
+create function public.squad_people(p_squad uuid)
+returns table (user_id uuid, display_name text, role text, status text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.user_id, p.display_name, m.role, m.status
+  from public.squad_members m join public.profiles p on p.id = m.user_id
+  where m.squad_id = p_squad and private.is_squad_member(p_squad)
+  order by m.status, p.display_name;
+$$;
+revoke all on function public.squad_people(uuid) from public, anon;
+grant execute on function public.squad_people(uuid) to authenticated;
+
 -- Chat -----------------------------------------------------------------------------
 
 create table public.squad_messages (

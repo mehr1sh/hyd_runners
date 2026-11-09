@@ -6,7 +6,7 @@
 -- reported and hidden.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(38);
 
 create function pg_temp.act_as(uid uuid) returns void language sql as $$
   select set_config('role', 'authenticated', true),
@@ -30,21 +30,21 @@ insert into public.user_blocks (blocker_id, blocked_id) values ('ae000000-0000-4
 -- ---------------------------------------------------------------- matching
 select pg_temp.act_as('ae000000-0000-4000-8000-0000000000a1');
 select is((select count(*) from public.matching_profiles), 1::bigint, 'runners see only their own matching profile');
-select is((select count(*) from public.find_running_matches()), 2::bigint, 'matches exclude blocked runners');
-select ok((select 'Runs in the same area' = any (reasons) and 'Similar pace' = any (reasons) from public.find_running_matches() limit 1),
+select is((select count(*) from public.find_running_matches() where user_id::text like 'ae000000-%'), 2::bigint, 'matches exclude blocked runners');
+select ok((select 'Runs in the same area' = any (reasons) and 'Similar pace' = any (reasons) from public.find_running_matches() where user_id::text like 'ae000000-%' limit 1),
   'matches explain why');
-select ok((select bool_and(shared_areas = '{gachibowli}') from public.find_running_matches()), 'only shared coarse areas are returned');
+select ok((select bool_and(shared_areas = '{gachibowli}') from public.find_running_matches() where user_id::text like 'ae000000-%'), 'only shared coarse areas are returned');
 select lives_ok($$ insert into public.match_dismissals (other_id) values ('ae000000-0000-4000-8000-0000000000b1') $$, 'a runner dismisses a match');
-select is((select count(*) from public.find_running_matches()), 1::bigint, 'dismissed runners disappear');
+select is((select count(*) from public.find_running_matches() where user_id::text like 'ae000000-%'), 1::bigint, 'dismissed runners disappear');
 reset role;
 update public.profiles set discoverable = false where id = 'ae000000-0000-4000-8000-0000000000c1';
 select pg_temp.act_as('ae000000-0000-4000-8000-0000000000a1');
-select is((select count(*) from public.find_running_matches()), 0::bigint, 'undiscoverable runners are not matched');
+select is((select count(*) from public.find_running_matches() where user_id::text like 'ae000000-%'), 0::bigint, 'undiscoverable runners are not matched');
 reset role;
 update public.profiles set discoverable = true where id = 'ae000000-0000-4000-8000-0000000000c1';
 update public.matching_profiles set opted_in = false where user_id = 'ae000000-0000-4000-8000-0000000000a1';
 select pg_temp.act_as('ae000000-0000-4000-8000-0000000000a1');
-select is((select count(*) from public.find_running_matches()), 0::bigint, 'opted-out runners get no matches');
+select is((select count(*) from public.find_running_matches() where user_id::text like 'ae000000-%'), 0::bigint, 'opted-out runners get no matches');
 select pg_temp.act_as('ae000000-0000-4000-8000-0000000000c1');
 select ok(not exists (select 1 from public.find_running_matches() where user_id = 'ae000000-0000-4000-8000-0000000000a1'),
   'and are not offered to others');
@@ -111,6 +111,11 @@ select lives_ok($$ insert into public.squad_runs (squad_id, title, starts_at, me
 select throws_ok($$ insert into public.squad_run_attendance (run_id, status) values ((select id from public.squad_runs), 'attended') $$,
   '22023', null, 'attendance waits for the run to start');
 select is(jsonb_array_length(public.squad_dashboard((select id from sq))->'members'), 3, 'the dashboard lists active members');
+select is((select count(*) from public.squad_people((select id from sq)) where display_name is not null), 4::bigint,
+  'members see everyone''s names, including the pending invite');
+select pg_temp.act_as('ae000000-0000-4000-8000-0000000000d1');
+select is((select count(*) from public.squad_people((select id from sq))), 0::bigint, 'outsiders get no names');
+select pg_temp.act_as('ae000000-0000-4000-8000-0000000000a1');
 
 -- Captaincy and leaving.
 select throws_ok($$ select public.squad_membership((select id from sq), 'ae000000-0000-4000-8000-0000000000a1', 'leave') $$,
