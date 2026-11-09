@@ -30,6 +30,7 @@ describe("navigation", () => {
       "Schedule",
       "Programmes",
       "Workouts",
+      "Activities",
       "Reports",
     ]);
     expect(sectionTabsFor("/runs/abc")?.[0].href).toBe("/explore");

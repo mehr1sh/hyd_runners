@@ -247,7 +247,7 @@ reset role;
 select is(
   (select array_agg(p.proname order by p.proname)::text from pg_proc p
     where p.pronamespace = 'public'::regnamespace and p.prosecdef),
-  '{appoint_club_admin,check_in_attendee,club_leaderboard,club_roster,club_stats,consume_rate_limit,event_attendance,event_roster,event_team_members,join_club_with_invite,list_message_recipients,moderation_report_content,my_waitlist_position,report_content,resolve_report,route_review_comments,route_review_summary,schedule_series_runs,series_history,weekly_leaderboard}',
+  '{appoint_club_admin,check_in_attendee,club_leaderboard,club_roster,club_stats,consume_rate_limit,event_attendance,event_roster,event_team_members,finalize_activity_import,join_club_with_invite,list_message_recipients,moderation_report_content,my_waitlist_position,report_content,resolve_report,route_review_comments,route_review_summary,schedule_series_runs,series_history,weekly_leaderboard}',
   'no new SECURITY DEFINER function in public can bypass message RLS without review');
 select is(
   (select count(*)::int from information_schema.routine_privileges

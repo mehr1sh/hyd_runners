@@ -1,0 +1,166 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+import { RouteMap } from "@/components/map/route-map";
+import { PageHeader } from "@/components/shared/page-header";
+import { Badge } from "@/components/ui/badge";
+import { ActivitySettings } from "@/features/activities/components/activity-settings";
+import { ACTIVITY_TYPE_LABEL, duration, km, pace } from "@/features/activities/logic/format";
+import { PR_DISTANCES } from "@/features/activities/logic/normalize";
+import { getActivity } from "@/features/activities/queries";
+import { getRunnerContext } from "@/features/dashboard/context";
+import { formatDateTime } from "@/features/dashboard/format";
+import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
+import { formatDuration } from "@/features/events/logic";
+import { ElevationProfile } from "@/features/routes/components/elevation-profile";
+
+export const metadata: Metadata = { title: "Activity" };
+
+export default async function ActivityPage({ params }: PageProps<"/activities/[id]">) {
+  const { id } = await params;
+  if (!z.uuid().safeParse(id).success) notFound();
+  const ctx = await getRunnerContext();
+  if (!ctx)
+    return (
+      <>
+        <PageHeader title="Activity" />
+        <RunnerPreviewNotice feature="activities" />
+      </>
+    );
+  const page = await getActivity(ctx.supabase, id, ctx.user.id);
+  if (!page) notFound();
+  const { activity: a, own, track } = page;
+  const title = a.name ?? ACTIVITY_TYPE_LABEL[a.type];
+  const line = own ? (track?.path ?? a.publicPath) : a.publicPath;
+
+  if (a.status !== "ready") {
+    return (
+      <>
+        <PageHeader title={title} />
+        <div className="max-w-xl space-y-3 rounded-xl border bg-card p-4 text-sm">
+          {a.status === "failed" ? (
+            <p role="alert">
+              This import failed:{" "}
+              {a.failureReason?.startsWith("duplicate:") ? (
+                <>
+                  it duplicates{" "}
+                  <Link href={`/activities/${a.failureReason.slice(10)}`} className="underline underline-offset-4">
+                    an activity you already imported
+                  </Link>
+                  .
+                </>
+              ) : a.failureReason === "internal" ? (
+                "something went wrong while processing. Import the file again."
+              ) : (
+                a.failureReason
+              )}
+            </p>
+          ) : (
+            <p>This activity is still being processed.</p>
+          )}
+          {own && <ActivitySettings id={a.id} visibility={a.visibility} trim={a.privacyTrimM} name={a.name} />}
+        </div>
+      </>
+    );
+  }
+
+  const stats: [string, string][] = [
+    ["Distance", km(a.distanceM)],
+    [a.movingSource === "device" ? "Moving time" : "Moving time (estimated)", duration(a.movingSeconds)],
+    ["Elapsed time", duration(a.elapsedSeconds)],
+    ["Average pace", pace(a.avgPace)],
+    ["Elevation gain", a.elevationGain === null ? "Not in file" : `${Math.round(a.elevationGain)} m`],
+  ];
+  if (own && track?.avgHeartRate)
+    stats.push(["Average heart rate", `${track.avgHeartRate} bpm (max ${track.maxHeartRate})`]);
+  if (own && track?.avgCadence) stats.push(["Average cadence", `${track.avgCadence} spm`]);
+  const splits = a.kmSplits ?? [];
+  const fastest = splits
+    .filter((s) => !s.partial)
+    .reduce<number | null>((m, s) => (m === null || s.pace < m ? s.pace : m), null);
+
+  return (
+    <>
+      <PageHeader title={title} description={a.startedAt ? formatDateTime(a.startedAt, ctx.timezone) : undefined} />
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
+          {line && <RouteMap label={`Map of ${title}`} lines={[{ id: a.id, name: title, coordinates: line }]} />}
+          {own && line && a.publicPath !== line && (
+            <p className="text-xs text-muted-foreground">
+              You see your full route. Others see it with the start and end hidden ({a.privacyTrimM} m).
+            </p>
+          )}
+          <dl className="grid grid-cols-2 gap-3 rounded-xl border bg-card p-4 text-sm sm:grid-cols-3">
+            {stats.map(([k, v]) => (
+              <div key={k}>
+                <dt className="text-xs text-muted-foreground">{k}</dt>
+                <dd className="font-semibold text-brand-navy">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          {a.elevationProfile && <ElevationProfile profile={a.elevationProfile} />}
+          {splits.length > 0 && (
+            <section className="space-y-2" aria-labelledby="splits">
+              <h2 id="splits" className="font-semibold text-brand-navy">
+                Kilometre splits
+              </h2>
+              <table className="w-full text-sm">
+                <caption className="sr-only">Time and pace for each kilometre</caption>
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="py-1">Km</th>
+                    <th>Time</th>
+                    <th>Pace</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {splits.map((s) => (
+                    <tr
+                      key={s.index}
+                      className={`border-t ${s.pace === fastest ? "font-semibold text-brand-navy" : ""}`}
+                    >
+                      <td className="py-1">{s.partial ? `${s.index} (${s.meters} m)` : s.index}</td>
+                      <td>{formatDuration(s.seconds)}</td>
+                      <td>
+                        {pace(s.pace)}
+                        {s.pace === fastest ? " · fastest" : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+        </div>
+        <aside className="space-y-4">
+          <section className="space-y-2 rounded-xl border bg-card p-4 text-sm" aria-labelledby="efforts">
+            <h2 id="efforts" className="font-semibold text-brand-navy">
+              Best efforts in this activity
+            </h2>
+            {Object.keys(a.bestEfforts).length === 0 ? (
+              <p className="text-muted-foreground">Too short for a best effort.</p>
+            ) : (
+              <ul className="space-y-1">
+                {PR_DISTANCES.filter((d) => a.bestEfforts[d.key]).map((d) => (
+                  <li key={d.key}>
+                    {d.label}: <span className="font-medium">{formatDuration(a.bestEfforts[d.key]!)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-muted-foreground">Measured from your GPS track, not an official race result.</p>
+          </section>
+          <section className="space-y-1 rounded-xl border bg-card p-4 text-sm">
+            <Badge variant="secondary">{a.format?.toUpperCase()} import</Badge>
+            {a.workoutLogId && <p className="text-muted-foreground">Counted once in your workouts and rewards.</p>}
+          </section>
+          {own && <ActivitySettings id={a.id} visibility={a.visibility} trim={a.privacyTrimM} name={a.name} />}
+          <Link href="/activities" className="text-sm underline underline-offset-4">
+            All activities
+          </Link>
+        </aside>
+      </div>
+    </>
+  );
+}
