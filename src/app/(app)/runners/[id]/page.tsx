@@ -27,11 +27,14 @@ export default async function RunnerPage({ params }: PageProps<"/runners/[id]">)
   if (!profile) notFound();
   const self = profile.id === ctx.user.id;
   const activities = profile.blockedByMe ? [] : await visibleActivitiesOf(ctx.supabase, id);
+  const { data: showcaseData } = await ctx.supabase.rpc("runner_showcase", { p_user: id });
+  const showcase = showcaseData as Showcase | null;
 
   return (
     <>
       <PageHeader title={profile.displayName} description={profile.bio ?? undefined} />
       <div className="max-w-2xl space-y-6">
+        {showcase && <ShowcaseView s={showcase} />}
         <p className="text-sm">
           {profile.followers} follower{profile.followers === 1 ? "" : "s"} · following {profile.following}
           {profile.followsMe ? " · follows you" : ""}
@@ -102,5 +105,92 @@ export default async function RunnerPage({ params }: PageProps<"/runners/[id]">)
         )}
       </div>
     </>
+  );
+}
+
+type Showcase = {
+  theme: "classic" | "night" | "sunrise" | "lake";
+  badges: { code: string; title: string }[];
+  routes: { slug: string; name: string; distanceM: number }[];
+  clubs: { slug: string; name: string }[];
+  races: { name: string; date: string; seconds: number | null; source: string }[] | null;
+  bests: Record<string, number> | null;
+};
+
+const THEME_BAND = {
+  classic: "bg-brand-navy-soft",
+  night: "bg-[#0b0f1a] text-white",
+  sunrise: "bg-[#ffe7c7]",
+  lake: "bg-[#dff1f7]",
+} as const;
+const SOURCE = {
+  organizer_verified: "organiser-verified",
+  imported_activity: "from an activity",
+  self_reported: "self-reported",
+} as const;
+const BEST = { "5k": "5 km", "10k": "10 km", half: "Half", marathon: "Marathon" } as const;
+
+function clock(s: number) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h ? `${h}:` : ""}${String(m).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function ShowcaseView({ s }: { s: Showcase }) {
+  const empty =
+    !s.badges.length && !s.routes.length && !s.clubs.length && !s.races?.length && !Object.keys(s.bests ?? {}).length;
+  if (empty) return null;
+  return (
+    <section
+      aria-label="Showcase"
+      className={`space-y-2 rounded-xl p-4 text-sm ${THEME_BAND[s.theme] ?? THEME_BAND.classic}`}
+    >
+      {s.badges.length > 0 && <p>Badges: {s.badges.map((b) => b.title).join(" · ")}</p>}
+      {s.clubs.length > 0 && (
+        <p>
+          Clubs:{" "}
+          {s.clubs.map((c, i) => (
+            <span key={c.slug}>
+              {i > 0 && " · "}
+              <Link href={`/clubs/${c.slug}`} className="underline underline-offset-4">
+                {c.name}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
+      {s.routes.length > 0 && (
+        <p>
+          Favourite routes:{" "}
+          {s.routes.map((r, i) => (
+            <span key={r.slug}>
+              {i > 0 && " · "}
+              <Link href={`/routes/${r.slug}`} className="underline underline-offset-4">
+                {r.name}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
+      {s.bests && Object.keys(s.bests).length > 0 && (
+        <p>
+          Best efforts (GPS):{" "}
+          {Object.entries(s.bests)
+            .map(([k, v]) => `${BEST[k as keyof typeof BEST] ?? k} ${clock(v)}`)
+            .join(" · ")}
+        </p>
+      )}
+      {s.races && s.races.length > 0 && (
+        <ul aria-label="Race history">
+          {s.races.map((r, i) => (
+            <li key={i}>
+              {r.name}, {String(r.date).slice(0, 10)}
+              {r.seconds ? `: ${clock(r.seconds)}` : ""}{" "}
+              <span className="opacity-70">({SOURCE[r.source as keyof typeof SOURCE] ?? r.source})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

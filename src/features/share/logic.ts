@@ -16,7 +16,16 @@ export const CARD_FORMATS = {
 } as const;
 export type CardFormat = keyof typeof CARD_FORMATS;
 
-export type CardOptions = { format: CardFormat; showRoute: boolean; showPace: boolean };
+/** Poster styles. Every theme draws the same real data: only colours and layout change. */
+export const CARD_THEMES = {
+  classic: "Classic",
+  neon: "Neon route (dark)",
+  minimal: "Minimal city line",
+  elevation: "Elevation profile",
+} as const;
+export type CardTheme = keyof typeof CARD_THEMES;
+
+export type CardOptions = { format: CardFormat; showRoute: boolean; showPace: boolean; theme?: CardTheme };
 
 export function parseCardOptions(params: URLSearchParams): CardOptions {
   const f = params.get("format");
@@ -24,6 +33,7 @@ export function parseCardOptions(params: URLSearchParams): CardOptions {
     format: f && Object.hasOwn(CARD_FORMATS, f) ? (f as CardFormat) : "square",
     showRoute: params.get("route") !== "0",
     showPace: params.get("pace") !== "0",
+    theme: ((t) => (t && Object.hasOwn(CARD_THEMES, t) ? (t as CardTheme) : "classic"))(params.get("theme")),
   };
 }
 
@@ -31,6 +41,7 @@ export function cardQuery(o: CardOptions) {
   const p = new URLSearchParams({ format: o.format });
   if (!o.showRoute) p.set("route", "0");
   if (!o.showPace) p.set("pace", "0");
+  if (o.theme && o.theme !== "classic") p.set("theme", o.theme);
   return p.toString();
 }
 
@@ -82,4 +93,18 @@ export function safeFilename(name: string) {
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) || "hyd-runners"
   );
+}
+
+/** SVG path for an elevation profile ([distance m, elevation m] pairs), scaled to fit. */
+export function elevationSvgPath(profile: [number, number][] | null, w: number, h: number) {
+  if (!profile || profile.length < 2) return null;
+  const xs = profile.map((p) => p[0]);
+  const ys = profile.map((p) => p[1]);
+  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+  const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+  const sx = (x: number) => Math.round(((x - x0) / Math.max(1, x1 - x0)) * w);
+  const sy = (y: number) => Math.round(h - ((y - y0) / Math.max(1, y1 - y0)) * (h * 0.85) - h * 0.05);
+  const step = Math.max(1, Math.floor(profile.length / 300));
+  const pts = profile.filter((_, i) => i % step === 0 || i === profile.length - 1);
+  return `M0 ${h} ${pts.map((p) => `L${sx(p[0])} ${sy(p[1])}`).join(" ")} L${w} ${h} Z`;
 }

@@ -34,6 +34,7 @@ describe("navigation", () => {
       "Workouts",
       "Activities",
       "Performance",
+      "Wrapped",
       "Reports",
       "Recovery",
       "Strength",
