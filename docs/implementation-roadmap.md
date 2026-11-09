@@ -26,20 +26,20 @@ Release 1 is sequenced in this order:
 | B. Clubs                                | Production verified (schema), 2026-11-08 | #16 `2443506` | `20261111120000_clubs`      | Club-scoped roles, join requests, invite links, announcements, club runs, stats and a members-only leaderboard. Managers create clubs. Dry run 42503061059, apply 42503121609, verify 42503216535                                                                                                                                             |
 | C. Group runs and pace pods             | Production verified (schema), 2026-11-08 | #17 `61cff45` | `20261112120000_group_runs` | Recurring series scheduled into events with default pace groups, no-drop and regroup policies, turnout and personal run history. Dry run 42504958021, apply 42505019352, verify 42505078833                                                                                                                                                   |
 | D. Routes v1 and Hyderabad Run Explorer | Production verified (schema), 2026-11-08 | #18 `0720666` | `20261113120000_routes`     | PostGIS routes with database-computed distance and loops, provenance and manager-only verification, GPX uploads (real elevation only), reviews, expiring condition reports, event and series links, event route maps. Two curated OpenStreetMap traces (attributed, not verified). Dry run 42507576402, apply 42507633827, verify 42507688292 |
-| E. Navigation redesign                  | PR opened                                |               | none                        | Six sections (Today, Train, Explore, Community, Events, Profile), section tabs, Train and Explore hubs with real counts; every existing URL kept                                                                                                                                                                                              |
+| E. Navigation redesign                  | Deployed, 2026-11-08                     | #19 `b37e330` | none                        | Six sections with section tabs and Train/Explore hubs; all existing URLs kept; new routes confirmed live behind sign-in                                                                                                                                                                                                                       |
 
 ## Release 2: activity intelligence and engagement
 
-| Workstream                        | Status      | Notes                                                            |
-| --------------------------------- | ----------- | ---------------------------------------------------------------- |
-| A. GPX/FIT import                 | Not started |                                                                  |
-| B. Performance Lab v1             | Not started | Needs A for splits and elevation                                 |
-| C. Weather and running conditions | Not started | Provider licensing must be decided first; see the register below |
-| D. Challenges v2                  | Not started | Must keep the current XP and award idempotency                   |
-| E. Share cards                    | Not started |                                                                  |
-| F. Dashboard redesign             | Not started |                                                                  |
-| G. Route search                   | Not started | Needs Release 1 D                                                |
-| H. Social v1                      | Not started | Reuses Release 0 moderation                                      |
+| Workstream                        | Status      | Notes                                                                                                                                                                                                                |
+| --------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. GPX/FIT import                 | PR opened   | Activities with owner-only tracks, privacy-trimmed shared routes, service-only metrics, duplicate detection, manual-log reconciliation; see [activities.md](activities.md). FIT parsing with `fit-file-parser` (MIT) |
+| B. Performance Lab v1             | Not started | Needs A for splits and elevation                                                                                                                                                                                     |
+| C. Weather and running conditions | Not started | Provider licensing must be decided first; see the register below                                                                                                                                                     |
+| D. Challenges v2                  | Not started | Must keep the current XP and award idempotency                                                                                                                                                                       |
+| E. Share cards                    | Not started |                                                                                                                                                                                                                      |
+| F. Dashboard redesign             | Not started |                                                                                                                                                                                                                      |
+| G. Route search                   | Not started | Needs Release 1 D                                                                                                                                                                                                    |
+| H. Social v1                      | Not started | Reuses Release 0 moderation                                                                                                                                                                                          |
 
 ## Release 3: HYD Coach
 
