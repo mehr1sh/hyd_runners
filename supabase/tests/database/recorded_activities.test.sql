@@ -1,4 +1,4 @@
--- pgTAP: recorded activities (migration 20261126120000_recorded_activities):
+-- pgTAP: recorded activities (migration 20261122120000_recorded_activities):
 -- one activity per runner and client_ref, client_ref is fixed once set,
 -- runners cannot write another runner's recording, and recorded runs finalise
 -- through the same service-only path as file imports.

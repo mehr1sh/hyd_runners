@@ -19,7 +19,7 @@ The HYD Runners mobile app lives in `mobile/`. It is a small Expo / React Native
 | `mobile/src/ui/`, `App.tsx`, `index.ts`                      | Screens (sign-in, home + sync list, permission explanations, recording, summary, settings) and a tiny state-based navigator.                             |
 | `src/app/api/v1/activities/recorded/route.ts`                | Web API endpoint the app uploads to.                                                                                                                     |
 | `src/features/activities/logic/recorded.ts`                  | Validation and conversion of recordings into the import pipeline.                                                                                        |
-| `supabase/migrations/20261126120000_recorded_activities.sql` | `client_ref`, `'app'` source.                                                                                                                            |
+| `supabase/migrations/20261122120000_recorded_activities.sql` | `client_ref`, `'app'` source.                                                                                                                            |
 
 The root `pnpm lint / format:check / typecheck / test / build` ignore `mobile/` (eslint `globalIgnores`, `.prettierignore`, `tsconfig.json` `exclude`, vitest `exclude`). The mobile package has its own checks:
 
@@ -120,7 +120,7 @@ Balanced accuracy and batching let the OS keep the GPS radio idle more of the ti
   - `202 { data: { status: "processing" } }` — another request is finishing it; retry later.
   - `422 validation_failed` — invalid body, or the recording fails import rules (too short, impossible speed …). Final.
   - `401`, `429`, `500` as elsewhere.
-- **Database** (`20261126120000_recorded_activities.sql`): `activities.client_ref uuid`, unique `(user_id, client_ref) where client_ref is not null`, `import_source` and `source_format` may be `'app'`, a check that `client_ref` is only set on app recordings, and an insert-only column grant for `client_ref, import_source` (no update grant: the reference cannot change). Existing RLS is unchanged: runners can only insert their own rows, and only the service role writes metrics.
+- **Database** (`20261122120000_recorded_activities.sql`): `activities.client_ref uuid`, unique `(user_id, client_ref) where client_ref is not null`, `import_source` and `source_format` may be `'app'`, a check that `client_ref` is only set on app recordings, and an insert-only column grant for `client_ref, import_source` (no update grant: the reference cannot change). Existing RLS is unchanged: runners can only insert their own rows, and only the service role writes metrics.
 - **Tests**: `tests/unit/activities/recorded-logic.test.ts` (validation and conversion), `tests/unit/runner/recorded-activities.integration.test.ts` (end to end against local Supabase: bearer auth, idempotent and concurrent retries, per-runner scoping, duplicates, validation), `supabase/tests/database/recorded_activities.test.sql` (pgTAP: uniqueness, immutability, cross-runner writes, service-only finalisation).
 - Known edge: if the runner deletes the activity on the web and an old upload of the same `clientRef` is retried later, it is stored again (the app only retries until it gets a confirmation, so this needs a lost response plus a delete in between).
 
@@ -170,7 +170,7 @@ None of the following has been done; each needs the owner's accounts or decision
 4. **Google Play Console** (one-time fee): create the app, upload an AAB from `eas build --profile production`, complete the **Data safety** form (precise location, collected, linked to the account, used for app functionality, not shared; health data read for app functionality; encryption in transit; account deletion), the **background location declaration** with a demo video, the **foreground service type (location)** declaration and the **Health Connect** permissions declaration, a privacy policy URL, and content rating.
 5. **App Store Connect**: App Privacy “nutrition label” (precise location, health & fitness, linked to identity, not used for tracking), the **privacy manifest** (`PrivacyInfo.xcprivacy`: declare required-reason API usage of the app and its native dependencies via `ios.privacyManifests` in `app.config.ts`, and check the generated file), justification for “Always” location and HealthKit in review notes, privacy policy URL, and TestFlight review before release.
 6. **Signing keys**: Android upload key + Play App Signing; iOS distribution certificate and provisioning profiles (EAS can manage both). Store backups outside the repository.
-7. **Production config**: production Supabase URL and publishable key, the production web URL as `EXPO_PUBLIC_API_BASE_URL`, and the `20261126120000_recorded_activities` migration applied to production **before** the app ships.
+7. **Production config**: production Supabase URL and publishable key, the production web URL as `EXPO_PUBLIC_API_BASE_URL`, and the `20261122120000_recorded_activities` migration applied to production **before** the app ships.
 8. Optional later: OTA updates (`expo-updates`, EAS Update channels per variant), crash reporting service behind `reportError`.
 
 ## What is verified vs untested
