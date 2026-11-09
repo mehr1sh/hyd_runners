@@ -1,5 +1,6 @@
 import "server-only";
 import { fetchAllPages } from "@/features/shared/db";
+import { isMissingSchemaError } from "@/lib/supabase/errors";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TIMEZONE, type WorkoutType } from "@/lib/contracts";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -160,6 +161,13 @@ export async function reconcileRewards(userId: string, admin = createAdminClient
       .eq("user_id", userId)
       .eq("status", "active");
     if (error) throw new Error(`Could not complete enrolment: ${error.message}`);
+  }
+
+  // Challenges v2: complete and reward any joined challenge this workout finished.
+  // Idempotent in the database (reward key challenge:<id>); never fails the workout.
+  const settled = await admin.rpc("settle_challenges_for", { p_user: userId });
+  if (settled.error && !isMissingSchemaError(settled.error)) {
+    console.error("[rewards] challenge settlement failed", settled.error.code);
   }
 
   return inserted;
