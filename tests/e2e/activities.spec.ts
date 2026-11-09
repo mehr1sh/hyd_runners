@@ -84,6 +84,11 @@ test("a runner imports GPX and FIT files and sees splits, records and privacy co
   await page.getByRole("button", { name: "Import activity" }).click();
   await expect(page.getByText("Upload a GPX or FIT activity file.")).toBeVisible({ timeout: 20_000 });
 
+  // The dashboard shows the latest imports and the last 7 days.
+  await page.goto("/dashboard");
+  await expect(page.getByRole("list", { name: "Recent activities" })).toContainText(`Dawn 5K ${stamp}`);
+  await expect(page.getByText("Unavailable right now.")).toHaveCount(0);
+
   await page.goto("/activities");
   const list = page.getByRole("list", { name: "Activities" });
   await expect(list.getByRole("listitem")).toHaveCount(2);
