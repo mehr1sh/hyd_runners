@@ -21,6 +21,7 @@ import { formatDateTime } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { weekStart } from "@/features/gamification/logic/time";
 import { SeriesForm } from "@/features/group-runs/components/series-forms";
+import { ChallengeForm } from "@/features/challenges/components/challenge-forms";
 import { publicEnv } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Manage club" };
@@ -68,6 +69,7 @@ export default async function ManageClubPage({ params }: PageProps<"/clubs/[slug
             <TabsTrigger value="announcements">Announcements</TabsTrigger>
             {page.canAdmin && <TabsTrigger value="events">Club runs</TabsTrigger>}
             {page.canAdmin && <TabsTrigger value="series">Weekly runs</TabsTrigger>}
+            {page.canAdmin && <TabsTrigger value="challenges">Challenges</TabsTrigger>}
             {page.canAdmin && <TabsTrigger value="invites">Invites</TabsTrigger>}
             {page.canAdmin && <TabsTrigger value="details">Details</TabsTrigger>}
           </TabsList>
@@ -143,6 +145,14 @@ export default async function ManageClubPage({ params }: PageProps<"/clubs/[slug
               page under Group runs.
             </p>
             <SeriesForm clubId={club.id} locations={locations} />
+          </TabsContent>
+        )}
+        {page.canAdmin && (
+          <TabsContent value="challenges" className="space-y-2 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Club challenges are visible to and joinable by club members only.
+            </p>
+            <ChallengeForm clubId={club.id} today={ctx.today} />
           </TabsContent>
         )}
         {page.canAdmin && (
