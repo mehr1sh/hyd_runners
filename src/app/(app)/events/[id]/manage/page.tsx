@@ -78,7 +78,7 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
         )}
         {detail.canManage && (
           <TabsContent value="pace" className="pt-4">
-            <PaceGroupManager eventId={event.id} groups={detail.paceGroups} />
+            <PaceGroupManager eventId={event.id} groups={detail.paceGroups} team={team} />
           </TabsContent>
         )}
         {detail.canManage && (
