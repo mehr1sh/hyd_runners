@@ -31,7 +31,7 @@ export async function loadCoachData(supabase: SupabaseClient, userId: string, in
   const todayTs = localMidnightUtc(today, timezone).toISOString();
   const in14 = localMidnightUtc(addDays(today, 15), timezone).toISOString();
 
-  const [weekly, runs, efforts, upcoming, pastPlan, prefs, conditions, goal] = await Promise.all([
+  const [weekly, runs, efforts, upcoming, pastPlan, prefs, conditions, goal, journal] = await Promise.all([
     supabase.rpc("my_weekly_series", {
       p_from: localMidnightUtc(firstWeek, timezone).toISOString(),
       p_to: tomorrowTs,
@@ -74,6 +74,13 @@ export async function loadCoachData(supabase: SupabaseClient, userId: string, in
       .eq("user_id", userId)
       .eq("status", "active")
       .maybeSingle(),
+    supabase
+      .from("recovery_entries")
+      .select("entry_date, fatigue, soreness, sleep_quality")
+      .eq("user_id", userId)
+      .gte("entry_date", addDays(today, -13))
+      .order("entry_date", { ascending: false })
+      .limit(14),
   ]);
   const g = check("race_goals", goal) as Record<string, unknown> | null;
 
@@ -145,6 +152,11 @@ export async function loadCoachData(supabase: SupabaseClient, userId: string, in
           name: (g.name as string | null) ?? null,
         }
       : null,
-    recovery: [],
+    recovery: (check("recovery_entries", journal) as Record<string, unknown>[]).map((e) => ({
+      date: e.entry_date as string,
+      fatigue: e.fatigue === null ? null : Number(e.fatigue),
+      soreness: e.soreness === null ? null : Number(e.soreness),
+      sleepQuality: e.sleep_quality === null ? null : Number(e.sleep_quality),
+    })),
   };
 }

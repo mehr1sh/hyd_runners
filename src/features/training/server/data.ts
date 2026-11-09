@@ -30,7 +30,7 @@ export type RaceGoal = {
 
 export type StoredProposal = {
   id: string;
-  kind: "race_plan" | "missed_session" | "adaptive" | "coach";
+  kind: "race_plan" | "missed_session" | "adaptive" | "coach" | "return_to_run";
   status: "proposed" | "accepted" | "rejected" | "superseded";
   title: string;
   summary: string;
