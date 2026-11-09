@@ -22,6 +22,7 @@ import {
   sessionsBetween,
   toStoredChange,
 } from "./server/data";
+import { recentFatigue } from "@/features/recovery/server/queries";
 
 export type TrainingState = { status: "idle" | "error" | "success"; message?: string };
 
@@ -188,13 +189,12 @@ export async function proposeForMissed(_p: TrainingState, fd: FormData): Promise
 export async function checkAdaptive(): Promise<TrainingState> {
   const s = await session();
   if ("error" in s) return { status: "error", message: s.error };
-  const [past14, upcoming7, goal] = await Promise.all([
+  const [past14, upcoming7, goal, fatigue] = await Promise.all([
     past14Stats(s.supabase, s.user.id, s.timezone, s.today),
     sessionsBetween(s.supabase, s.user.id, s.timezone, s.today, 7),
     activeGoal(s.supabase, s.user.id),
+    recentFatigue(s.supabase, s.user.id, s.today),
   ]);
-  // Journal fatigue joins this check with the recovery journal (workstream C).
-  const fatigue = null as number | null;
   const p = adaptiveProposal({ past14, upcoming7, fatigue });
   if (!p)
     return {
