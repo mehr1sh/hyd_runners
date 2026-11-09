@@ -24,6 +24,7 @@ const ROUTES = [
   "/notifications",
   "/matching",
   "/squads",
+  "/leagues",
   "/profile",
   "/coach",
   "/manager",
