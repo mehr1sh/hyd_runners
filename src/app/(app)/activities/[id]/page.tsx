@@ -6,6 +6,8 @@ import { RouteMap } from "@/components/map/route-map";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { ActivitySettings } from "@/features/activities/components/activity-settings";
+import { ShareCardPanel } from "@/features/share/components/share-card-panel";
+import { safeFilename } from "@/features/share/logic";
 import { ACTIVITY_TYPE_LABEL, duration, km, pace } from "@/features/activities/logic/format";
 import { PR_DISTANCES } from "@/features/activities/logic/normalize";
 import { pacingAnalysis } from "@/features/activities/logic/performance";
@@ -223,6 +225,19 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
             <Badge variant="secondary">{a.format?.toUpperCase()} import</Badge>
             {a.workoutLogId && <p className="text-muted-foreground">Counted once in your workouts and rewards.</p>}
           </section>
+          {own && (
+            <section className="space-y-2 rounded-xl border bg-card p-4" aria-labelledby="share">
+              <h2 id="share" className="font-semibold text-brand-navy">
+                Share card
+              </h2>
+              <ShareCardPanel
+                endpoint={`/api/v1/activities/${a.id}/card`}
+                filename={safeFilename(a.name ?? `activity-${(a.startedAt ?? "").slice(0, 10)}`)}
+                canHideRoute={Boolean(a.publicPath)}
+                canHidePace={a.type === "run" || a.type === "walk_run"}
+              />
+            </section>
+          )}
           {own && <ActivitySettings id={a.id} visibility={a.visibility} trim={a.privacyTrimM} name={a.name} />}
           <Link href="/activities" className="text-sm underline underline-offset-4">
             All activities

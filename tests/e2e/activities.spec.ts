@@ -57,6 +57,23 @@ test("a runner imports GPX and FIT files and sees splits, records and privacy co
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
 
+  // Share cards: rendered for the owner as PNG, at the requested size.
+  const activityId = new URL(page.url()).pathname.split("/").pop()!;
+  const preview = page.getByRole("img", { name: "Preview of your share card" });
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth), { timeout: 15_000 })
+    .toBe(1080);
+  await page.getByLabel("Format").selectOption("story");
+  await page.getByLabel("Show pace").uncheck();
+  await expect(preview).toHaveAttribute("src", `/api/v1/activities/${activityId}/card?format=story&pace=0`);
+  const card = await page.request.get(`/api/v1/activities/${activityId}/card?format=story&pace=0`);
+  expect(card.status()).toBe(200);
+  expect(card.headers()["content-type"]).toBe("image/png");
+  expect(card.headers()["cache-control"]).toContain("no-store");
+  const png = await card.body();
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1080, 1920]);
+
   // The same file again is caught as a duplicate.
   await page.goto("/activities/import");
   await page
@@ -96,4 +113,12 @@ test("a runner imports GPX and FIT files and sees splits, records and privacy co
   await expect(list.getByRole("listitem")).toHaveCount(1);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+  // Another runner cannot render a card for it, even though it is public; nor can a signed-out visitor.
+  const otherEmail = `e2e-act-other-${stamp}@example.test`;
+  const other = await admin.auth.admin.createUser({ email: otherEmail, password: PASSWORD, email_confirm: true });
+  if (other.error) throw new Error(other.error.message);
+  await signInAs(page, otherEmail);
+  expect((await page.request.get(`/api/v1/activities/${activityId}/card`)).status()).toBe(404);
+  await page.context().clearCookies();
+  expect((await page.request.get(`/api/v1/activities/${activityId}/card`)).status()).toBe(401);
 });
