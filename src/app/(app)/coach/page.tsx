@@ -89,9 +89,14 @@ function RunnersPanel({ runners }: { runners: CoachRunner[] }) {
         <h2 id="runners-h" className="text-lg font-semibold text-brand-navy">
           Your runners
         </h2>
-        <Link href="/coach/profile" className="text-sm underline underline-offset-4">
-          Your professional profile
-        </Link>
+        <span className="flex gap-3 text-sm">
+          <Link href="/coach/profile" className="underline underline-offset-4">
+            Your professional profile
+          </Link>
+          <Link href="/coach/services" className="underline underline-offset-4">
+            Services and bookings
+          </Link>
+        </span>
       </div>
       {runners.length === 0 ? (
         <p className="text-sm text-muted-foreground">No runners are assigned to you right now.</p>

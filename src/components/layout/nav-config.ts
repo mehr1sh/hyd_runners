@@ -56,7 +56,7 @@ export const RUNNER_NAV: NavItem[] = [
     label: "Community",
     icon: Users,
     mobilePrimary: true,
-    match: ["/clubs", "/challenges", "/feed", "/runners", "/squads", "/matching"],
+    match: ["/clubs", "/challenges", "/feed", "/runners", "/squads", "/matching", "/professionals", "/bookings"],
   },
   { href: "/events", label: "Events", icon: CalendarCheck },
   { href: "/profile", label: "Profile", icon: CircleUserRound },
@@ -101,6 +101,7 @@ export const SECTION_TABS: { section: string; tabs: { href: string; label: strin
       { href: "/runners", label: "Runners" },
       { href: "/squads", label: "Squads" },
       { href: "/matching", label: "Find partners" },
+      { href: "/professionals", label: "Coaches & physios" },
     ],
   },
 ];
