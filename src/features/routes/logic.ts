@@ -163,19 +163,3 @@ export function parseAttributes(formData: FormData) {
   if (!parsed.success) return { ok: false as const, message: parsed.error.issues[0]?.message ?? "Check the form." };
   return { ok: true as const, data: parsed.data };
 }
-
-export function parseRouteFilters(sp: Record<string, string | string[] | undefined>) {
-  const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
-  const km = (v: string | undefined) => {
-    const n = Number(v);
-    return v && Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
-  };
-  return {
-    beginner: one("beginner") === "1",
-    loop: one("loop") === "1",
-    verified: one("verified") === "1",
-    minKm: km(one("min")),
-    maxKm: km(one("max")),
-  };
-}
-export type RouteFilters = ReturnType<typeof parseRouteFilters>;

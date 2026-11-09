@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DatabaseQueryError } from "@/lib/supabase/errors";
-import type { ReportKind, RouteFilters } from "./logic";
+import type { ReportKind } from "./logic";
+import type { Place, SearchFilters } from "./search";
 
 export type RouteRow = {
   id: string;
@@ -102,22 +103,89 @@ export async function reviewSummaries(supabase: SupabaseClient, ids: string[]) {
   return map;
 }
 
-/** Published routes matching the filters, plus the viewer's own drafts when asked. */
-export async function listRoutes(
-  supabase: SupabaseClient,
-  filters: RouteFilters,
-  opts: { includeDrafts?: boolean } = {},
-) {
-  let query = supabase.from("routes").select(COLUMNS).order("name").limit(200);
-  query = opts.includeDrafts ? query.neq("status", "archived") : query.eq("status", "published");
-  if (filters.beginner) query = query.eq("beginner_suitable", true);
-  if (filters.loop) query = query.eq("is_loop", true);
-  if (filters.verified) query = query.eq("verified", true);
-  if (filters.minKm) query = query.gte("distance_m", filters.minKm * 1000);
-  if (filters.maxKm) query = query.lte("distance_m", filters.maxKm * 1000);
-  const { data, error } = await query;
-  if (error) throw new DatabaseQueryError("routes", error);
-  return (data ?? []).map(toRoute);
+export type SearchHit = RouteRow & {
+  distanceFromM: number | null;
+  rating: number | null;
+  reviews: number;
+  openReports: number;
+};
+
+/**
+ * Typed route search (`search_routes`, caller's rights so RLS decides what is
+ * visible). Archived routes are never returned; drafts only to their authors
+ * and managers, as the policies allow.
+ */
+export async function searchRoutes(supabase: SupabaseClient, f: SearchFilters, near: Place | null) {
+  const arr = (v: string[]) => (v.length ? v : null);
+  const { data, error } = await supabase.rpc("search_routes", {
+    p_text: f.text,
+    p_near_lat: near?.lat ?? null,
+    p_near_lon: near?.lon ?? null,
+    p_radius_m: Math.round(f.radiusKm * 1000),
+    p_min_m: f.minKm === null ? null : f.minKm * 1000,
+    p_max_m: f.maxKm === null ? null : f.maxKm * 1000,
+    p_surface: arr(f.surface),
+    p_terrain: arr(f.terrain),
+    p_difficulty: arr(f.difficulty),
+    p_lighting: arr(f.lighting),
+    p_shade: arr(f.shade),
+    p_loop: f.loop || null,
+    p_beginner: f.beginner || null,
+    p_verified: f.verified || null,
+    p_water: f.water || null,
+    p_toilets: f.toilets || null,
+    p_min_rating: f.minRating,
+    p_no_open_reports: f.noReports,
+    p_sort: near || f.sort !== "nearest" ? f.sort : "relevance",
+    p_limit: 100,
+  });
+  if (error) throw new DatabaseQueryError("search_routes", error);
+  const hits = (data ?? []) as {
+    id: string;
+    distance_from_m: number | null;
+    rating: number | null;
+    reviews: number;
+    open_reports: number;
+  }[];
+  if (hits.length === 0) return [];
+  const { data: rows, error: rowsError } = await supabase
+    .from("routes")
+    .select(COLUMNS)
+    .in(
+      "id",
+      hits.map((h) => h.id),
+    );
+  if (rowsError) throw new DatabaseQueryError("routes", rowsError);
+  const byId = new Map((rows ?? []).map((r) => [r.id as string, toRoute(r)]));
+  return hits.flatMap((h): SearchHit[] => {
+    const route = byId.get(h.id);
+    if (!route) return [];
+    return [
+      {
+        ...route,
+        distanceFromM: h.distance_from_m === null ? null : Number(h.distance_from_m),
+        rating: h.rating === null ? null : Number(h.rating),
+        reviews: Number(h.reviews),
+        openReports: Number(h.open_reports),
+      },
+    ];
+  });
+}
+
+/** Known places for "near …" searches (the existing locations directory). */
+export async function searchPlaces(supabase: SupabaseClient): Promise<Place[]> {
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id, name, latitude, longitude")
+    .order("name")
+    .limit(500);
+  if (error) throw new DatabaseQueryError("locations", error);
+  return ((data ?? []) as { id: string; name: string; latitude: number; longitude: number }[]).map((l) => ({
+    id: l.id,
+    name: l.name,
+    lat: Number(l.latitude),
+    lon: Number(l.longitude),
+  }));
 }
 
 export type ConditionReport = { id: string; kind: ReportKind; note: string; createdAt: string; expiresAt: string };
