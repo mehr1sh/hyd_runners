@@ -118,6 +118,7 @@ export type PaceGroup = {
   maxPace: number | null;
   runWalk: boolean;
   notes: string | null;
+  leaderId: string | null;
 };
 
 /** Everything the event page shows. Null when the event is not visible to the caller. */
@@ -140,7 +141,7 @@ export async function getEventDetail(supabase: SupabaseClient, eventId: string, 
     supabase.rpc("my_waitlist_position", { p_event_id: event.id }),
     supabase
       .from("event_pace_groups")
-      .select("id, label, min_pace_seconds, max_pace_seconds, run_walk, notes")
+      .select("id, label, min_pace_seconds, max_pace_seconds, run_walk, notes, leader_id")
       .eq("event_id", event.id)
       .order("sort_order")
       .order("min_pace_seconds", { ascending: true, nullsFirst: false })
@@ -195,6 +196,7 @@ export async function getEventDetail(supabase: SupabaseClient, eventId: string, 
       minPace: (g.min_pace_seconds as number | null) ?? null,
       maxPace: (g.max_pace_seconds as number | null) ?? null,
       runWalk: g.run_walk as boolean,
+      leaderId: (g.leader_id as string | null) ?? null,
       notes: (g.notes as string | null) ?? null,
     })),
     updates: ((updates.data ?? []) as { id: string; body: string; created_at: string }[]).map((u) => ({

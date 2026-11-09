@@ -56,7 +56,6 @@ const DENIED_FEATURES = [
   "autoplay",
   "camera",
   "display-capture",
-  "geolocation",
   "gyroscope",
   "hid",
   "magnetometer",
@@ -148,8 +147,17 @@ export function reportOnlyCsp(env: SecurityHeadersEnv): string {
   });
 }
 
+/**
+ * Features allowed for this origin only, never for embedded or third-party
+ * frames. Geolocation is used solely by opt-in live sharing during a group
+ * run (/events/[id]/live), after the runner taps "Share my location".
+ */
+const SELF_ONLY_FEATURES = ["geolocation"];
+
 export function permissionsPolicy(): string {
-  return DENIED_FEATURES.map((feature) => `${feature}=()`).join(", ");
+  return [...DENIED_FEATURES.map((feature) => `${feature}=()`), ...SELF_ONLY_FEATURES.map((f) => `${f}=(self)`)].join(
+    ", ",
+  );
 }
 
 /** Every security header the app sends, for all routes. */
