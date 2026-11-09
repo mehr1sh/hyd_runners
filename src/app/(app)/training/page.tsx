@@ -9,6 +9,9 @@ import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { formatDuration } from "@/features/events/logic";
 import { addDays, daysBetween } from "@/features/gamification/logic/time";
 import { ProposalReview, RaceGoalForm, SimpleAction } from "@/features/training/components/forms";
+import { setCoachSharing } from "@/features/coach-platform/actions";
+import { ReplyForm } from "@/features/coach-platform/components/forms";
+import { notesFor } from "@/features/coach-platform/queries";
 import { WorkoutSteps } from "@/features/training/components/workout-steps";
 import { heatAdvice, HEAT_LABEL } from "@/features/training/logic/heat";
 import { RACE_DISTANCES } from "@/features/training/logic/predict";
@@ -55,7 +58,7 @@ export default async function TrainingPage() {
       </>
     );
   const { supabase, user, timezone, today } = ctx;
-  const [goal, preds, props, overdue, upcoming, level, forecast] = await Promise.all([
+  const [goal, preds, props, overdue, upcoming, level, forecast, notes, sharing] = await Promise.all([
     activeGoal(supabase, user.id),
     predictionsFor(supabase),
     proposals(supabase, user.id),
@@ -63,7 +66,10 @@ export default async function TrainingPage() {
     sessionsBetween(supabase, user.id, timezone, today, 7),
     profileLevel(supabase, user.id),
     forecastHours(),
+    notesFor(supabase, user.id),
+    supabase.from("profiles").select("coach_sees_training").eq("id", user.id).maybeSingle(),
   ]);
+  const sharesTraining = (sharing.data?.coach_sees_training as boolean | undefined) ?? true;
   const open = props.filter((p) => p.status === "proposed");
   const decided = props.filter((p) => p.status !== "proposed").slice(0, 5);
   const proposedFor = new Set(
@@ -315,6 +321,42 @@ export default async function TrainingPage() {
             <p className="text-xs text-muted-foreground">
               Estimates, not guaranteed finish times. Calculated {preds.calculatedAt.slice(0, 10)}.
             </p>
+          </section>
+          <section aria-labelledby="coach-h" id="coach" className="space-y-2 rounded-xl border bg-card p-4">
+            <h2 id="coach-h" className="font-semibold text-brand-navy">
+              Your coach
+            </h2>
+            {notes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Feedback from an assigned coach appears here.</p>
+            ) : (
+              <ul className="space-y-3 text-sm">
+                {notes.slice(0, 5).map((n) => (
+                  <li key={n.id} className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      {n.coachName ?? "Your coach"} · {n.createdAt.slice(0, 10)}
+                    </p>
+                    <p className="whitespace-pre-line">{n.body}</p>
+                    {n.replies.map((r) => (
+                      <p key={r.id} className="ml-3 border-l-2 pl-2 text-muted-foreground">
+                        {r.authorId === user.id ? "You" : "Coach"}: {r.body}
+                      </p>
+                    ))}
+                    <ReplyForm noteId={n.id} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form action={setCoachSharing} className="space-y-1 border-t pt-2 text-sm">
+              <label className="flex items-start gap-2">
+                <input type="checkbox" name="share" defaultChecked={sharesTraining} className="mt-1" />
+                <span>
+                  Let my assigned coach see my training summaries (never GPS tracks or unshared journal entries)
+                </span>
+              </label>
+              <button type="submit" className="text-sm underline underline-offset-4">
+                Save sharing choice
+              </button>
+            </form>
           </section>
           <nav aria-label="Training tools" className="space-y-1 rounded-xl border bg-card p-4 text-sm">
             <Link href="/training/pace" className="block underline underline-offset-4">

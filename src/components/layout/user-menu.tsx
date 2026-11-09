@@ -48,6 +48,9 @@ export function UserMenu({ user }: { user: CurrentUser | null }) {
         <DropdownMenuItem asChild>
           <Link href="/profile">Profile and preferences</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/notifications">Notifications</Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <form action={signOut}>
           <DropdownMenuItem asChild>
