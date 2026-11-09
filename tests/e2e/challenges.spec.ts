@@ -74,6 +74,12 @@ test("a runner completes a city challenge by logging a workout and is rewarded o
     .eq("user_id", runnerId)
     .eq("reason", "challenge_completed");
   expect(awards).toEqual([{ delta_xp: 75 }]);
+  await expect(page.getByRole("heading", { name: "Share your achievement" })).toBeVisible();
+  const challengeId = challengePath.split("/").pop()!;
+  const shareCard = await page.request.get(`/api/v1/challenges/${challengeId}/card?format=wide`);
+  expect(shareCard.status()).toBe(200);
+  const png = await shareCard.body();
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
