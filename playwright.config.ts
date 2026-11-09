@@ -19,6 +19,8 @@ export default defineConfig({
     ? undefined
     : {
         command: `pnpm start --port ${PORT}`,
+        // Tests never call live weather: the labelled sample provider is used.
+        env: { CONDITIONS_PROVIDER: "sample" },
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

@@ -14,6 +14,7 @@ const ROUTES = [
   "/community",
   "/events",
   "/map",
+  "/conditions",
   "/profile",
   "/coach",
   "/manager",
