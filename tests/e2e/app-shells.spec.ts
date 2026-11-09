@@ -17,6 +17,7 @@ const ROUTES = [
   "/feed",
   "/runners",
   "/conditions",
+  "/hyd-coach",
   "/profile",
   "/coach",
   "/manager",

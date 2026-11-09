@@ -31,7 +31,7 @@ export const RUNNER_NAV: NavItem[] = [
     label: "Train",
     icon: Dumbbell,
     mobilePrimary: true,
-    match: ["/schedule", "/programmes", "/workouts", "/activities", "/performance", "/reports"],
+    match: ["/schedule", "/programmes", "/workouts", "/activities", "/performance", "/reports", "/hyd-coach"],
   },
   {
     href: "/explore",
@@ -57,6 +57,7 @@ export const SECTION_TABS: { section: string; tabs: { href: string; label: strin
     section: "/train",
     tabs: [
       { href: "/train", label: "Overview" },
+      { href: "/hyd-coach", label: "HYD Coach" },
       { href: "/schedule", label: "Schedule" },
       { href: "/programmes", label: "Programmes" },
       { href: "/workouts", label: "Workouts" },
