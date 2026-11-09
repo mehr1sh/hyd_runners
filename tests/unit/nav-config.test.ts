@@ -28,6 +28,7 @@ describe("navigation", () => {
     expect(sectionTabsFor("/schedule")?.map((t) => t.label)).toEqual([
       "Overview",
       "HYD Coach",
+      "Race prep",
       "Schedule",
       "Programmes",
       "Workouts",

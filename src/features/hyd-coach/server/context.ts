@@ -5,6 +5,7 @@ import { addDays, localDate, localMidnightUtc, weekStart } from "@/features/gami
 import { callerTimezone } from "@/features/scheduler/server/data";
 import { loadConditions } from "@/features/conditions/server";
 import type { PrKey } from "@/features/activities/logic/normalize";
+import type { RaceKey } from "@/features/training/logic/predict";
 import type { Intent } from "../logic/intent";
 import type { CoachData, WeekRow } from "../logic/types";
 
@@ -30,7 +31,7 @@ export async function loadCoachData(supabase: SupabaseClient, userId: string, in
   const todayTs = localMidnightUtc(today, timezone).toISOString();
   const in14 = localMidnightUtc(addDays(today, 15), timezone).toISOString();
 
-  const [weekly, runs, efforts, upcoming, pastPlan, prefs, conditions] = await Promise.all([
+  const [weekly, runs, efforts, upcoming, pastPlan, prefs, conditions, goal] = await Promise.all([
     supabase.rpc("my_weekly_series", {
       p_from: localMidnightUtc(firstWeek, timezone).toISOString(),
       p_to: tomorrowTs,
@@ -67,7 +68,14 @@ export async function loadCoachData(supabase: SupabaseClient, userId: string, in
       .limit(200),
     supabase.from("user_preferences").select("goal, sessions_per_week").eq("user_id", userId).maybeSingle(),
     intent === "today" ? loadConditions(supabase, null).catch(() => null) : Promise.resolve(null),
+    supabase
+      .from("race_goals")
+      .select("distance, race_date, target_seconds, name")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle(),
   ]);
+  const g = check("race_goals", goal) as Record<string, unknown> | null;
 
   const byWeek = new Map(
     (check("my_weekly_series", weekly) as Record<string, unknown>[]).map((r) => [String(r.week_start).slice(0, 10), r]),
@@ -129,7 +137,14 @@ export async function loadCoachData(supabase: SupabaseClient, userId: string, in
             nowLevel: nowHour.level,
           }
         : null,
-    raceGoal: null,
+    raceGoal: g
+      ? {
+          distance: g.distance as RaceKey,
+          date: g.race_date as string,
+          targetSeconds: (g.target_seconds as number | null) ?? null,
+          name: (g.name as string | null) ?? null,
+        }
+      : null,
     recovery: [],
   };
 }

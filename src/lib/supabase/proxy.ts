@@ -25,6 +25,7 @@ export const PROTECTED_PREFIXES = [
   "/map",
   "/conditions",
   "/hyd-coach",
+  "/training",
   "/profile",
   "/coach",
   "/manager",

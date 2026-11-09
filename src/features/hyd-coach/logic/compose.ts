@@ -320,6 +320,7 @@ const COMPOSERS: Record<Exclude<Intent, "safety">, Composer> = {
     const runsPerWeek = last4.reduce((s, w) => s + w.runs, 0) / Math.max(last4.length, 1);
     const sessions = Math.min(6, Math.max(2, d.prefs?.sessionsPerWeek ?? Math.round(runsPerWeek || 3)));
     b.link("/schedule", "Plan your week");
+    b.link("/training", "Race preparation");
     if (base < 3000) {
       const v = b.fact("avg_week_4", "Average weekly distance, last 4 weeks", km(base));
       return {
@@ -415,6 +416,7 @@ const COMPOSERS: Record<Exclude<Intent, "safety">, Composer> = {
   },
 
   race(d, b, q) {
+    b.link("/training", "Race preparation");
     const target = d.raceGoal?.distance ?? mentionedDistance(q);
     const preds = predictRaces(d.efforts, d.nowMs).filter((p) => !target || p.race === target);
     const lines: string[] = [];
