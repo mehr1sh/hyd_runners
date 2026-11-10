@@ -73,7 +73,12 @@ async function tokenRequest(cfg: StravaConfig, body: Record<string, string>, fet
 }
 
 /** The code exchange must confirm the granted scope includes activity:read. */
-export async function exchangeCode(cfg: StravaConfig, code: string, grantedScope: string, fetchImpl: typeof fetch = fetch) {
+export async function exchangeCode(
+  cfg: StravaConfig,
+  code: string,
+  grantedScope: string,
+  fetchImpl: typeof fetch = fetch,
+) {
   if (!grantedScope.split(",").includes(STRAVA_SCOPE))
     throw new StravaError("scope", "Activity access was not granted.");
   return tokenRequest(cfg, { code, grant_type: "authorization_code" }, fetchImpl);
