@@ -39,8 +39,9 @@ select pg_temp.act_as('f4000000-0000-4000-8000-0000000000b1');
 select throws_ok($$ insert into public.activity_reflections (activity_id, user_id, story) values
   ('f4000000-0000-4000-8000-00000000ac01', 'f4000000-0000-4000-8000-0000000000b1', 'Not mine') $$, '42501', null,
   'nobody reflects on someone else''s activity');
-select is((select count(*) from public.activity_reflections), 1::bigint, 'shared stories show only on activities others can see');
-select is((select difficult from public.activity_reflections), 'The last hill', 'the shared story is readable');
+select is((select count(*) from public.activity_reflections where user_id = 'f4000000-0000-4000-8000-0000000000a1'), 1::bigint,
+  'shared stories show only on activities others can see');
+select is((select difficult from public.activity_reflections where user_id = 'f4000000-0000-4000-8000-0000000000a1'), 'The last hill', 'the shared story is readable');
 select is(jsonb_array_length(public.runner_showcase('f4000000-0000-4000-8000-0000000000a1')->'badges'), 1,
   'only earned badges are showcased');
 select is(public.runner_showcase('f4000000-0000-4000-8000-0000000000a1')->>'theme', 'night', 'the theme is shown');
