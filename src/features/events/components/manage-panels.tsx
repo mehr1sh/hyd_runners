@@ -13,6 +13,8 @@ import {
   recordResultAction,
   removeTeamMemberAction,
   savePaceGroupAction,
+  setVolunteerTaskAction,
+  setPaceGroupLeaderAction,
   type EventFormState,
 } from "../actions";
 import { formatDuration, paceRangeLabel, TEAM_ROLE_LABEL, type TeamRole } from "../logic";
@@ -156,12 +158,35 @@ function MakeTeamMember({ eventId, userId, name }: { eventId: string; userId: st
         <select name="role" defaultValue="captain" className={selectClass}>
           <option value="captain">Run captain</option>
           <option value="sweeper">Sweeper</option>
+          <option value="volunteer">Volunteer</option>
         </select>
       </label>
       <Button type="submit" size="sm" variant="ghost" disabled={pending}>
         Add
       </Button>
       <Note state={state} />
+    </form>
+  );
+}
+
+function VolunteerTask({ eventId, userId, task }: { eventId: string; userId: string; task: string }) {
+  const [state, action, pending] = useActionState(setVolunteerTaskAction, idle);
+  return (
+    <form action={action} className="mt-1 flex flex-wrap items-center gap-1">
+      <input type="hidden" name="eventId" value={eventId} />
+      <input type="hidden" name="userId" value={userId} />
+      <Input
+        name="task"
+        defaultValue={task}
+        maxLength={120}
+        placeholder="e.g. Water station, km 5"
+        aria-label="Volunteer task"
+        className="h-8 w-56"
+      />
+      <Button type="submit" size="sm" variant="outline" disabled={pending}>
+        Save task
+      </Button>
+      {state.message && <span className="text-xs text-muted-foreground">{state.message}</span>}
     </form>
   );
 }
@@ -173,7 +198,7 @@ export function TeamList({
   staff,
 }: {
   eventId: string;
-  team: { userId: string; displayName: string; role: TeamRole }[];
+  team: { userId: string; displayName: string; role: TeamRole; task?: string | null }[];
   canManage: boolean;
   staff: { id: string; displayName: string }[] | null;
 }) {
@@ -188,6 +213,12 @@ export function TeamList({
             <li key={m.userId} className="flex items-center justify-between gap-2 p-3">
               <span>
                 {m.displayName} <span className="text-muted-foreground">· {TEAM_ROLE_LABEL[m.role]}</span>
+                {m.role === "volunteer" && !canManage && m.task && (
+                  <span className="block text-xs">Task: {m.task}</span>
+                )}
+                {m.role === "volunteer" && canManage && (
+                  <VolunteerTask eventId={eventId} userId={m.userId} task={m.task ?? ""} />
+                )}
               </span>
               {canManage && <RemoveTeamMember eventId={eventId} userId={m.userId} name={m.displayName} />}
             </li>
@@ -219,6 +250,8 @@ export function TeamList({
               <option value="organiser">Organiser</option>
               <option value="captain">Run captain</option>
               <option value="sweeper">Sweeper</option>
+              <option value="volunteer">Volunteer</option>
+              <option value="volunteer">Volunteer</option>
             </select>
           </label>
           <Button type="submit" disabled={pending}>
@@ -247,7 +280,54 @@ function RemoveTeamMember({ eventId, userId, name }: { eventId: string; userId: 
   );
 }
 
-export function PaceGroupManager({ eventId, groups }: { eventId: string; groups: PaceGroup[] }) {
+function LeaderPicker({
+  eventId,
+  group,
+  team,
+}: {
+  eventId: string;
+  group: PaceGroup;
+  team: { userId: string; displayName: string; role: string }[];
+}) {
+  const [state, action, pending] = useActionState(setPaceGroupLeaderAction, idle);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-1">
+      <input type="hidden" name="eventId" value={eventId} />
+      <input type="hidden" name="paceGroupId" value={group.id} />
+      <select
+        name="leaderId"
+        defaultValue={group.leaderId ?? ""}
+        aria-label={`Leader of ${group.label}`}
+        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+      >
+        <option value="">No leader</option>
+        {team.map((m) => (
+          <option key={m.userId} value={m.userId}>
+            {m.displayName}
+          </option>
+        ))}
+      </select>
+      <Button type="submit" size="sm" variant="outline" disabled={pending}>
+        Set leader
+      </Button>
+      {state.message && (
+        <span role={state.status === "error" ? "alert" : "status"} className="text-xs text-muted-foreground">
+          {state.message}
+        </span>
+      )}
+    </form>
+  );
+}
+
+export function PaceGroupManager({
+  eventId,
+  groups,
+  team = [],
+}: {
+  eventId: string;
+  groups: PaceGroup[];
+  team?: { userId: string; displayName: string; role: string }[];
+}) {
   const [state, action, pending] = useActionState(savePaceGroupAction, idle);
   return (
     <div className="space-y-3">
@@ -259,7 +339,10 @@ export function PaceGroupManager({ eventId, groups }: { eventId: string; groups:
                 <span className="font-medium text-brand-navy">{g.label}</span>{" "}
                 <span className="text-muted-foreground">{paceRangeLabel(g.minPace, g.maxPace, g.runWalk)}</span>
               </span>
-              <DeletePaceGroup eventId={eventId} paceGroupId={g.id} label={g.label} />
+              <span className="flex flex-wrap items-center gap-2">
+                {team.length > 0 && <LeaderPicker eventId={eventId} group={g} team={team} />}
+                <DeletePaceGroup eventId={eventId} paceGroupId={g.id} label={g.label} />
+              </span>
             </li>
           ))}
         </ul>

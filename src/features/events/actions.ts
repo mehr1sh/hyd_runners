@@ -122,6 +122,30 @@ export async function savePaceGroupAction(_prev: EventFormState, formData: FormD
   return { status: "success", message: "Pace group added." };
 }
 
+export async function setPaceGroupLeaderAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const eventId = String(formData.get("eventId") ?? "");
+  const paceGroupId = String(formData.get("paceGroupId") ?? "");
+  const leader = String(formData.get("leaderId") ?? "");
+  const uuid = /^[0-9a-f-]{36}$/i;
+  if (!uuid.test(eventId) || !uuid.test(paceGroupId) || (leader && !uuid.test(leader)))
+    return { status: "error", message: "Check the form." };
+  const { error, data } = await current.supabase
+    .from("event_pace_groups")
+    .update({ leader_id: leader || null })
+    .eq("id", paceGroupId)
+    .eq("event_id", eventId)
+    .select("id");
+  if (error || !data?.length)
+    return {
+      status: "error",
+      message: error?.code === "22023" ? "Leaders must be on the event team." : "Could not update the leader.",
+    };
+  refresh(eventId);
+  return { status: "success", message: leader ? "Leader assigned." : "Leader removed." };
+}
+
 export async function deletePaceGroupAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {
   const current = await session();
   if (!current.ok) return { status: "error", message: current.message };
@@ -165,7 +189,7 @@ export async function recordResultAction(_prev: EventFormState, formData: FormDa
 const TeamDraft = z.object({
   eventId: z.uuid(),
   userId: z.uuid("Choose a person."),
-  role: z.enum(["organiser", "captain", "sweeper"], "Choose a role."),
+  role: z.enum(["organiser", "captain", "sweeper", "volunteer"], "Choose a role."),
 });
 
 export async function addTeamMemberAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {
@@ -188,12 +212,30 @@ export async function addTeamMemberAction(_prev: EventFormState, formData: FormD
       error.code === "23505"
         ? "That person is already on the team."
         : error.code === "42501"
-          ? "Only managers can add organisers. Organisers can add captains and sweepers."
+          ? "Only managers can add organisers. Organisers can add captains, sweepers and volunteers."
           : failMsg(error, "Could not add them to the team.");
     return { status: "error", message };
   }
   refresh(parsed.data.eventId);
   return { status: "success", message: "Added to the team." };
+}
+
+export async function setVolunteerTaskAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const parsed = z
+    .object({ eventId: z.uuid(), userId: z.uuid(), task: z.string().trim().max(120) })
+    .safeParse({ eventId: formData.get("eventId"), userId: formData.get("userId"), task: formData.get("task") ?? "" });
+  if (!parsed.success) return { status: "error", message: "Tasks can be up to 120 characters." };
+  const { data, error } = await current.supabase
+    .from("event_team")
+    .update({ task: parsed.data.task || null })
+    .eq("event_id", parsed.data.eventId)
+    .eq("user_id", parsed.data.userId)
+    .select("user_id");
+  if (error || !data?.length) return { status: "error", message: "Only organisers can set tasks." };
+  refresh(parsed.data.eventId);
+  return { status: "success", message: "Task saved." };
 }
 
 export async function removeTeamMemberAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {

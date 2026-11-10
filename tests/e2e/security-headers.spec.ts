@@ -63,7 +63,7 @@ test.describe("security headers", () => {
       expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
       expect(h["x-frame-options"]).toBe("DENY");
       expect(h["permissions-policy"]).toContain("camera=()");
-      expect(h["permissions-policy"]).toContain("geolocation=()");
+      expect(h["permissions-policy"]).toContain("geolocation=(self)");
       expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
       expect(h["content-security-policy"]).toContain("object-src 'none'");
       expect(h["content-security-policy"]).toContain("form-action 'self'");
