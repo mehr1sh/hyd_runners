@@ -12,6 +12,7 @@ import { getRunnerContext } from "@/features/dashboard/context";
 import { formatDateTime } from "@/features/dashboard/format";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { PaceGroupManager, Roster, TeamList, UpdateComposer } from "@/features/events/components/manage-panels";
+import { ResultsImportForm, SponsorForm } from "@/features/passport/components/forms";
 import { getEventDetail, getRoster } from "@/features/events/queries";
 import { routeOptions } from "@/features/routes/queries";
 
@@ -40,9 +41,19 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
     detail.canManage ? routeOptions(ctx.supabase) : Promise.resolve([]),
   ]);
   const { event } = detail;
+  const { data: taskRows } = await ctx.supabase.from("event_team").select("user_id, task").eq("event_id", event.id);
+  const tasks = new Map(
+    ((taskRows ?? []) as { user_id: string; task: string | null }[]).map((t) => [t.user_id, t.task]),
+  );
+  const { data: sponsorRows } = await ctx.supabase
+    .from("event_sponsors")
+    .select("name, tier")
+    .eq("event_id", event.id)
+    .order("tier");
+  const sponsors = (sponsorRows ?? []) as { name: string; tier: string }[];
   const team = detail.team
     .filter((m): m is typeof m & { user_id: string } => m.user_id !== null)
-    .map((m) => ({ userId: m.user_id, displayName: m.display_name, role: m.role }));
+    .map((m) => ({ userId: m.user_id, displayName: m.display_name, role: m.role, task: tasks.get(m.user_id) ?? null }));
   const staff = people?.ok ? people.data.staff.map((p) => ({ id: p.id, displayName: p.displayName })) : null;
 
   return (
@@ -66,6 +77,7 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
             {detail.canManage && <TabsTrigger value="pace">Pace groups</TabsTrigger>}
             {detail.canManage && <TabsTrigger value="updates">Updates</TabsTrigger>}
             <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="raceday">Race day</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="roster" className="pt-4">
@@ -89,6 +101,43 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
             </p>
           </TabsContent>
         )}
+        <TabsContent value="raceday" className="space-y-6 pt-4">
+          <section className="space-y-1 text-sm">
+            <h2 className="font-semibold text-brand-navy">QR check-in</h2>
+            <p>
+              Runners with a place show a check-in code in their Race Passport. Scan it with your phone camera and
+              confirm on the page that opens. Check-in opens two hours before the start.
+            </p>
+            <a href={`/api/v1/events/${event.id}/attendance`} className="underline underline-offset-4">
+              Download attendance (CSV)
+            </a>
+          </section>
+          {detail.canManage && (
+            <>
+              <section className="space-y-2">
+                <h2 className="font-semibold text-brand-navy">Results</h2>
+                <p className="text-sm text-muted-foreground">
+                  Download the attendance file, fill in outcome and time, and paste the lines here. Results you record
+                  are shown to runners as verified by the organiser.
+                </p>
+                <ResultsImportForm eventId={event.id} />
+              </section>
+              <section className="space-y-2">
+                <h2 className="font-semibold text-brand-navy">Sponsors</h2>
+                <ul className="text-sm">
+                  {sponsors.map((sp) => (
+                    <li key={sp.name}>
+                      {sp.name} <span className="text-muted-foreground">· {sp.tier}</span>
+                    </li>
+                  ))}
+                  {sponsors.length === 0 && <li className="text-muted-foreground">No sponsors listed.</li>}
+                </ul>
+                <SponsorForm eventId={event.id} />
+              </section>
+            </>
+          )}
+          <p className="text-xs text-muted-foreground">Payments and ticketing are not enabled.</p>
+        </TabsContent>
         <TabsContent value="team" className="pt-4">
           <TeamList eventId={event.id} team={team} canManage={detail.canManage} staff={staff} />
           {!isManager && detail.canManage && (

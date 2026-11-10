@@ -29,6 +29,7 @@ describe("navigation", () => {
       "Overview",
       "HYD Coach",
       "Race prep",
+      "Race Passport",
       "Schedule",
       "Programmes",
       "Workouts",
