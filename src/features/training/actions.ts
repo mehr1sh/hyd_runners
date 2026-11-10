@@ -7,21 +7,10 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { callerTimezone } from "@/features/scheduler/server/data";
 import { addDays, localDate } from "@/features/gamification/logic/time";
-import { adaptiveProposal, missedSessionProposal, type Change } from "./logic/adapt";
+import { adaptiveProposal, missedSessionProposal } from "./logic/adapt";
 import { parseClock } from "./logic/pace";
-import { generateRacePlan, PHASE_LABEL } from "./logic/race-plan";
-import { RACE_DISTANCES } from "./logic/predict";
-import { describeWorkout, type WorkoutDetails } from "./logic/workouts";
-import {
-  activeGoal,
-  overdueSessions,
-  past14Stats,
-  predictionsFor,
-  preferredStartTime,
-  recentWeeklyKm,
-  sessionsBetween,
-  toStoredChange,
-} from "./server/data";
+import { buildRacePlanProposal } from "./server/race-plan-proposal";
+import { activeGoal, overdueSessions, past14Stats, sessionsBetween, toStoredChange } from "./server/data";
 import { recentFatigue } from "@/features/recovery/server/queries";
 
 export type TrainingState = { status: "idle" | "error" | "success"; message?: string };
@@ -108,48 +97,9 @@ export async function closeRaceGoal(_p: TrainingState, fd: FormData): Promise<Tr
 export async function proposeRacePlan(): Promise<TrainingState> {
   const s = await session();
   if ("error" in s) return { status: "error", message: s.error };
-  const goal = await activeGoal(s.supabase, s.user.id);
-  if (!goal) return { status: "error", message: "Set a race goal first." };
-  const [{ paces }, weeklyKm, startTime] = await Promise.all([
-    predictionsFor(s.supabase),
-    recentWeeklyKm(s.supabase, s.timezone, s.today),
-    preferredStartTime(s.supabase, s.user.id),
-  ]);
-  const plan = generateRacePlan({
-    distance: goal.distance,
-    raceDate: goal.raceDate,
-    today: s.today,
-    level: goal.level,
-    daysPerWeek: goal.daysPerWeek,
-    longRunDay: goal.longRunDay,
-    recentWeeklyKm: weeklyKm,
-    paces,
-    raceName: goal.name,
-  });
-  const changes: Change[] = plan.weeks.flatMap((w) =>
-    w.sessions.map((x): Change => ({
-      op: "add",
-      title: x.title,
-      workout_type: x.workoutType,
-      date: x.date,
-      start_time: startTime,
-      duration_minutes: Math.min(300, Math.max(5, x.minutes)),
-      rationale: x.rationale,
-      details: { ...x.details, week: w.index, phase: w.phase },
-      label: `Week ${w.index} (${PHASE_LABEL[w.phase]}), ${x.date}: ${x.title}, ${x.minutes} min${"kind" in x.details && x.details.kind !== "strength" && x.details.kind !== "race" ? `: ${describeWorkout(x.details as WorkoutDetails)}` : ""}`,
-    })),
-  );
-  if (changes.length === 0) return { status: "error", message: "The race is too close to plan sessions." };
-  const race = RACE_DISTANCES.find((r) => r.key === goal.distance)!;
-  const { error } = await s.supabase.from("training_proposals").insert({
-    user_id: s.user.id,
-    kind: "race_plan",
-    race_goal_id: goal.id,
-    title: `${plan.weeks.length}-week ${race.label} plan`,
-    summary: `${changes.length} sessions from ${plan.weeks[0].weekStart} to race day on ${goal.raceDate}. A recommendation for you to review: nothing is added until you accept.`,
-    reasons: [...plan.warnings, ...plan.assumptions].slice(0, 12),
-    changes: changes.map((c) => toStoredChange(c, s.timezone)),
-  });
+  const built = await buildRacePlanProposal(s.supabase, s.user.id, s.timezone, s.today);
+  if ("error" in built) return { status: "error", message: built.error };
+  const { error } = await s.supabase.from("training_proposals").insert(built.row);
   if (error) return { status: "error", message: dbMessage(error.code) };
   revalidatePath("/training");
   return { status: "success", message: "Plan proposed. Review it below." };

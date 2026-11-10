@@ -53,6 +53,27 @@ export async function directory(supabase: SupabaseClient) {
   }[];
 }
 
+export type SampleProfessional = {
+  user_id: string;
+  display_name: string;
+  profession: string;
+  headline: string | null;
+  experience_years: number | null;
+  specializations: string[];
+  verification_status: "unverified" | "pending";
+  services: { title: string; kind: string; durationMinutes: number; delivery: "online" | "in_person" }[];
+};
+
+/**
+ * Sample profiles from the local demo data (accounts flagged as demo by the
+ * service role). Never verified and never bookable; empty in production.
+ */
+export async function sampleProfessionals(supabase: SupabaseClient): Promise<SampleProfessional[]> {
+  const { data, error } = await supabase.rpc("sample_professionals");
+  if (error) throw new DatabaseQueryError("sample_professionals", error);
+  return (data ?? []) as SampleProfessional[];
+}
+
 export async function professionalPage(supabase: SupabaseClient, id: string) {
   const [dir, profile, services, slots] = await Promise.all([
     directory(supabase),

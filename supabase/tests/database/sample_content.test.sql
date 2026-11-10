@@ -94,10 +94,16 @@ select is((select count(*)::int from public.programmes where slug <> 'test-runni
 select is((select count(*)::int from public.programme_sessions), 312, '312 programme sessions in total');
 
 -- ---------------------------------------------------------------- no fabricated activity
+-- Accounts flagged demo by the service role come from the local demo seed
+-- (scripts/demo-data), not from this migration.
+create temp table demo_accounts as select id from auth.users where raw_app_meta_data ->> 'demo' = 'true';
 select is(
-  (select count(*)::int from public.event_rsvps r join seed_events e on e.id = r.event_id)
-  + (select count(*)::int from public.enrollments n join seed_programmes p on p.id = n.programme_id)
-  + (select count(*)::int from public.workout_logs w join seed_sessions s on s.id = w.programme_session_id), 0,
+  (select count(*)::int from public.event_rsvps r join seed_events e on e.id = r.event_id
+    where r.user_id not in (select id from demo_accounts))
+  + (select count(*)::int from public.enrollments n join seed_programmes p on p.id = n.programme_id
+    where n.user_id not in (select id from demo_accounts))
+  + (select count(*)::int from public.workout_logs w join seed_sessions s on s.id = w.programme_session_id
+    where w.user_id not in (select id from demo_accounts)), 0,
   'the migration creates no RSVPs, enrolments or workouts');
 
 -- ---------------------------------------------------------------- visible to the public

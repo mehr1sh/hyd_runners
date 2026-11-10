@@ -86,6 +86,20 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      # Local demo data (scripts/demo-data): runs only against this job's local
+      # Supabase stack, after the e2e suite so it cannot affect it.
+      - name: Demo data seeds idempotently and resets cleanly
+        run: |
+          pnpm demo:seed > /dev/null
+          pnpm -s demo:check > first.json
+          pnpm demo:seed > /dev/null
+          pnpm -s demo:check > second.json
+          diff first.json second.json
+          cat second.json
+          pnpm demo:reset
+          left=$(docker exec supabase_db_hyd-runners psql -U postgres -tAc \
+            "select count(*) from auth.users where email like '%@demo.hydrunners.test'")
+          test "$left" = "0"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:

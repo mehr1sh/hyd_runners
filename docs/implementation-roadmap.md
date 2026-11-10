@@ -96,6 +96,15 @@ Signed-in production flows are not tested, because that would need production te
 - **Preview builds:** every Vercel Preview build failed from `c613c12` (2026-11-09 15:35 UTC) until #42. `/manager/professionals` called Supabase during prerendering in preview mode (Preview has no Supabase variables). Production builds were unaffected. #42 fixed the page and added a "Build in preview mode" CI job.
 - **Production reachability:** from one network, the production alias timed out because DNS returned Vercel edge addresses (`…195`) that network couldn't reach for any site. Through other edges, and from an independent network, the alias was healthy. It later resolved to reachable edges. No domain or deployment change was needed.
 
+## Local demo data
+
+`pnpm demo:seed` fills a **local** database with a fictional Hyderabad running community (22 labelled sample accounts, clubs, group runs, events, squads, leagues, challenges, 143 GPS activities through the import pipeline, rewards, a race plan and coaching), so every page can be explored. See [demo-data.md](demo-data.md).
+
+- **Status:** CI/local verified. CI seeds twice and resets after the e2e suite.
+- **Production:** never seeded. The runner refuses non-local targets, and the seed is not a migration.
+- **Professionals:** sample profiles are never verified. Migration `20261201120000_sample_professionals` lists them separately and returns nothing in production.
+- **Populated Preview:** would need a separate Supabase project (owner decision, possible cost). Not set up.
+
 ## UX debt
 
 - Several older forms wrap a `<select>` inside its `<label>`, which adds the option text to the control's accessible name. The group-run form uses explicit `id`/`htmlFor`; migrate the rest.

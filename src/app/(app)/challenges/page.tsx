@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { ChallengeForm, JoinButton } from "@/features/challenges/components/challenge-forms";
@@ -85,6 +86,11 @@ export default async function ChallengesPage() {
             icon={Trophy}
             title="No open challenges"
             description="New challenges from the programme team and your clubs will appear here."
+            action={
+              <Button asChild variant="outline">
+                <Link href="/dashboard">This week&apos;s challenges</Link>
+              </Button>
+            }
           />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2" aria-label="Open challenges">

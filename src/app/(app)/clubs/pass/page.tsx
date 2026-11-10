@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { IdCard } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getRunnerContext } from "@/features/dashboard/context";
@@ -64,7 +65,16 @@ export default async function ClubPassPage() {
     <>
       {header}
       {rows.length === 0 ? (
-        <EmptyState icon={IdCard} title="No clubs yet" description="Join a club to see it on your pass." />
+        <EmptyState
+          icon={IdCard}
+          title="No clubs yet"
+          description="Join a club to see it on your pass."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/clubs">Browse clubs</Link>
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {rows.map((m) => {

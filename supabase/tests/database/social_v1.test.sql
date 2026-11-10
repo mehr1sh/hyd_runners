@@ -108,7 +108,8 @@ select is((select kudos::text || '/' || comments::text from public.activity_feed
   '1/1', 'the feed counts kudos and comments');
 
 select pg_temp.act_as('5a000000-0000-4000-8000-0000000000c1');
-select is((select count(*) from public.activity_comments), 0::bigint, 'strangers cannot read comments on followers-only activities');
+select is((select count(*) from public.activity_comments where activity_id::text like '5a000000-%'), 0::bigint,
+  'strangers cannot read comments on followers-only activities');
 
 -- ---------------------------------------------------------------- feed and names
 select pg_temp.act_as('5a000000-0000-4000-8000-0000000000b1');

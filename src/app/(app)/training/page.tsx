@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Flag } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getRunnerContext } from "@/features/dashboard/context";
@@ -233,6 +234,11 @@ export default async function TrainingPage() {
                 icon={Flag}
                 title="Nothing planned this week"
                 description="Accept a race plan, or plan your week on the schedule."
+                action={
+                  <Button asChild variant="outline">
+                    <Link href="/schedule">Plan your week</Link>
+                  </Button>
+                }
               />
             ) : (
               <ul className="space-y-3">
