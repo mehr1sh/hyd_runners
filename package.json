@@ -19,6 +19,9 @@
     "db:test": "supabase test db",
     "db:new": "supabase migration new",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
+    "demo:seed": "node scripts/demo-data/run.mjs seed",
+    "demo:reset": "node scripts/demo-data/run.mjs reset",
+    "demo:check": "node scripts/demo-data/run.mjs check",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
@@ -63,6 +66,7 @@
     "@vitest/coverage-v8": "5.0.4",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.5",
+    "jiti": "2.7.0",
     "jsdom": "30.1.2",
     "prettier": "3.9.10",
     "prettier-plugin-tailwindcss": "0.8.1",

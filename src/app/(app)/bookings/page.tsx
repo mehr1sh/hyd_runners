@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getRunnerContext } from "@/features/dashboard/context";
@@ -32,6 +33,11 @@ export default async function BookingsPage() {
           icon={CalendarClock}
           title="No bookings yet"
           description="Find a verified coach or physio to book a session."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/professionals">Coaches and physios</Link>
+            </Button>
+          }
         />
       ) : (
         <ul className="max-w-3xl space-y-2" aria-label="Bookings">

@@ -7,7 +7,8 @@ import { VerificationBadge } from "@/features/coach-platform/components/verifica
 import { getRunnerContext } from "@/features/dashboard/context";
 import { RunnerPreviewNotice } from "@/features/dashboard/preview-notice";
 import { BOUNDARIES } from "@/features/marketplace/logic";
-import { directory } from "@/features/marketplace/queries";
+import { directory, sampleProfessionals } from "@/features/marketplace/queries";
+import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = { title: "Coaches and physios" };
 
@@ -34,7 +35,7 @@ export default async function ProfessionalsPage() {
         <RunnerPreviewNotice feature="the professional directory" />
       </>
     );
-  const pros = await directory(ctx.supabase);
+  const [pros, samples] = await Promise.all([directory(ctx.supabase), sampleProfessionals(ctx.supabase)]);
   return (
     <>
       {header}
@@ -43,7 +44,7 @@ export default async function ProfessionalsPage() {
           <EmptyState
             icon={UserSearch}
             title="No verified professionals yet"
-            description="Professionals appear here once their credentials are verified."
+            description="Coaches, physiotherapists and other professionals appear here once an administrator has checked their credentials. Professionals can apply from their coach profile."
           />
         ) : (
           <ul className="space-y-2" aria-label="Professionals">
@@ -68,7 +69,44 @@ export default async function ProfessionalsPage() {
             ))}
           </ul>
         )}
-        <aside className="space-y-2 rounded-xl border bg-card p-4 text-sm">
+        {samples.length > 0 && (
+          <section aria-labelledby="sample-pros" className="space-y-2 lg:col-start-1">
+            <h2 id="sample-pros" className="font-semibold text-brand-navy">
+              Sample profiles
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Demo data for exploring the app. These are not real people, their credentials have not been checked, and
+              they can&apos;t be booked.
+            </p>
+            <ul className="space-y-2" aria-label="Sample profiles">
+              {samples.map((p) => (
+                <li key={p.user_id} className="space-y-1 rounded-xl border border-dashed bg-card p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{p.display_name}</span>
+                    <Badge variant="outline">Sample profile</Badge>
+                    <VerificationBadge status={p.verification_status} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {PROFESSION[p.profession as keyof typeof PROFESSION] ?? p.profession}
+                    {p.experience_years !== null ? ` · ${p.experience_years} years` : ""}
+                    {p.specializations.length > 0 ? ` · ${p.specializations.join(", ")}` : ""}
+                  </p>
+                  {p.headline && <p className="text-sm">{p.headline}</p>}
+                  {p.services.length > 0 && (
+                    <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                      {p.services.map((s) => (
+                        <li key={s.title}>
+                          {s.title} · {s.durationMinutes} min · {s.delivery === "online" ? "Online" : "In person"}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <aside className="space-y-2 rounded-xl border bg-card p-4 text-sm lg:col-start-2 lg:row-start-1">
           <h2 className="font-semibold text-brand-navy">Good to know</h2>
           <ul className="list-disc pl-5">
             {BOUNDARIES.map((b) => (

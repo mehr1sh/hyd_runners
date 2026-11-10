@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
@@ -88,6 +89,11 @@ export default async function CommunityPage() {
                   icon={Trophy}
                   title="No XP earned yet this week"
                   description="Complete a workout to get on the board."
+                  action={
+                    <Button asChild variant="outline">
+                      <Link href="/workouts/new">Log a workout</Link>
+                    </Button>
+                  }
                 />
               ) : (
                 <Table>

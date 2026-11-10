@@ -70,7 +70,9 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_ATTRIBUTION`                                 | Map tiles; defaults to OpenStreetMap (light use only). Use a commercial provider for real use |
 | `DEMO_SEED_ENABLED`, `DEMO_SEED_TOKEN`                                                    | Optional, local only; see below. Leave empty                                                  |
 
-**Demo seed.** `POST /api/v1/dev/seed-demo` creates or resets the labelled demo accounts (`demo.runner@hydrunners.test` and three sample runners). It is off unless `DEMO_SEED_ENABLED=true` and `DEMO_SEED_TOKEN` is at least 32 characters, and it always answers 404 on Vercel Production and Preview. Each run generates a new random password for the demo runner and returns it once in the response:
+**Demo data.** To explore a populated community locally (clubs, group runs, squads, leagues, challenges, a feed, race history, coaching and sample professionals), start the local stack and run `pnpm demo:seed`. It prints the sign-in details. `pnpm demo:reset` removes it all. It only ever touches the local Supabase stack; see [docs/demo-data.md](docs/demo-data.md).
+
+**Minimal demo seed.** `POST /api/v1/dev/seed-demo` creates or resets the labelled demo accounts (`demo.runner@hydrunners.test` and three sample runners). It is off unless `DEMO_SEED_ENABLED=true` and `DEMO_SEED_TOKEN` is at least 32 characters, and it always answers 404 on Vercel Production and Preview. Each run generates a new random password for the demo runner and returns it once in the response:
 
 ```bash
 curl -X POST -H "Authorization: Bearer $DEMO_SEED_TOKEN" http://localhost:3000/api/v1/dev/seed-demo

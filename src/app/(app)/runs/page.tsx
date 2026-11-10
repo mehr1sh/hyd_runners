@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Repeat, Sprout } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { listLocations } from "@/features/community/queries";
@@ -67,6 +68,11 @@ export default async function RunsPage({ searchParams }: PageProps<"/runs">) {
             icon={Repeat}
             title={beginner ? "No beginner runs yet" : "No group runs yet"}
             description="Weekly runs organised by clubs and the programme team will appear here."
+            action={
+              <Button asChild variant="outline">
+                <Link href="/events">See community events</Link>
+              </Button>
+            }
           />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarSearch } from "lucide-react";
 import { LocationMap } from "@/components/map/location-map";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getRunnerContext } from "@/features/dashboard/context";
@@ -49,6 +50,11 @@ export default async function RadarPage({ searchParams }: PageProps<"/runs/radar
           icon={CalendarSearch}
           title="No group runs in the next two weeks"
           description="Check back soon, or start one with your club."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/events">All events</Link>
+            </Button>
+          }
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
