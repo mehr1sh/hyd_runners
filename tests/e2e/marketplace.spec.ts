@@ -82,7 +82,9 @@ test("a runner books a verified coach; payments stay off", async ({ page }, test
   await expect(page.getByRole("checkbox", { name: /I've read this/ })).toHaveAttribute("required", "");
   await page.getByRole("checkbox", { name: /I've read this/ }).check();
   await page.getByRole("button", { name: "Request booking" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Running form review" })).toContainText("Waiting for confirmation");
+  await expect(page.getByRole("status").filter({ hasText: "Running form review" })).toContainText(
+    "Waiting for confirmation",
+  );
 
   // Coach confirms; runner sees it, with payments clearly off.
   await signInAs(page, `e2e-mk-p-${stamp}@example.test`);
