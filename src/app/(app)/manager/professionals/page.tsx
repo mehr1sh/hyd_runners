@@ -12,6 +12,15 @@ export const metadata: Metadata = { title: "Professional verification" };
 export default async function ProfessionalsPage() {
   const access = await requireRole(["admin"]);
   if (!access.allowed) return <AccessDenied area="Professional verification" />;
+  if (!access.user) {
+    // Preview mode (no Supabase): show the shell without loading data.
+    return (
+      <>
+        <PageHeader title="Professional verification" description="Review professional credentials." />
+        <p className="text-sm text-muted-foreground">Sign in with Supabase configured to review professionals.</p>
+      </>
+    );
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("professional_profiles")
