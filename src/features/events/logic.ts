@@ -12,7 +12,12 @@ export const EVENT_CATEGORY_LABEL = {
 export type EventCategory = keyof typeof EVENT_CATEGORY_LABEL;
 const CATEGORIES = Object.keys(EVENT_CATEGORY_LABEL) as [EventCategory, ...EventCategory[]];
 
-export const TEAM_ROLE_LABEL = { organiser: "Organiser", captain: "Run captain", sweeper: "Sweeper" } as const;
+export const TEAM_ROLE_LABEL = {
+  organiser: "Organiser",
+  captain: "Run captain",
+  sweeper: "Sweeper",
+  volunteer: "Volunteer",
+} as const;
 export type TeamRole = keyof typeof TEAM_ROLE_LABEL;
 
 export type RsvpStatus = "going" | "waitlisted" | "cancelled";
