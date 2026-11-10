@@ -12,7 +12,7 @@ import { radarRuns } from "@/features/live/queries";
 
 export const metadata: Metadata = { title: "Run Radar" };
 
-export default async function RadarPage() {
+export default async function RadarPage({ searchParams }: PageProps<"/runs/radar">) {
   const ctx = await getRunnerContext();
   const header = (
     <PageHeader
@@ -27,10 +27,23 @@ export default async function RadarPage() {
         <RunnerPreviewNotice feature="Run Radar" />
       </>
     );
-  const runs = await radarRuns(ctx.supabase);
+  const beginnerOnly = (await searchParams).beginner === "1";
+  const all = await radarRuns(ctx.supabase);
+  const runs = beginnerOnly ? all.filter((r) => r.beginner) : all;
   return (
     <>
       {header}
+      <p className="mb-4 text-sm">
+        {beginnerOnly ? (
+          <Link href="/runs/radar" className="underline underline-offset-4">
+            Show all group runs
+          </Link>
+        ) : (
+          <Link href="/runs/radar?beginner=1" className="underline underline-offset-4">
+            Beginner welcome runs only
+          </Link>
+        )}
+      </p>
       {runs.length === 0 ? (
         <EmptyState
           icon={CalendarSearch}
@@ -67,6 +80,7 @@ export default async function RadarPage() {
                         ? "Full (waiting list)"
                         : `${spots} of ${r.capacity} spots open`}
                   </p>
+                  {r.beginner && <Badge>Beginner welcome</Badge>}
                   {r.paceGroups.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {r.paceGroups.map((g) => (

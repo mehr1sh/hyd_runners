@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ghostComparison } from "@/features/experiments/logic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -86,6 +87,15 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
   const pacing = pacingAnalysis(a.kmSplits);
   const matches = own && a.hasGps ? await routeMatches(ctx.supabase, a.id) : [];
   const others = matches.filter((m) => m.activityId !== a.id);
+  // Ghost Runner: the most recent earlier effort on the matched route, if it has splits.
+  const ghostMatch = [...others]
+    .filter((m) => a.startedAt && m.startedAt < a.startedAt)
+    .sort((x, y) => y.startedAt.localeCompare(x.startedAt))[0];
+  const ghostSplits = ghostMatch
+    ? (((await ctx.supabase.from("activities").select("km_splits").eq("id", ghostMatch.activityId).maybeSingle()).data
+        ?.km_splits as { index: number; seconds: number; partial: boolean }[] | null) ?? [])
+    : [];
+  const ghost = ghostMatch && a.kmSplits ? ghostComparison(a.kmSplits, ghostSplits) : null;
   const [social, author] = await Promise.all([
     activitySocial(ctx.supabase, a.id, ctx.user.id),
     own ? Promise.resolve(null) : getRunnerProfile(ctx.supabase, a.userId),
@@ -161,6 +171,42 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
                   ))}
                 </tbody>
               </table>
+            </section>
+          )}
+          {own && ghost && ghost.rows.length > 0 && ghostMatch && (
+            <section className="space-y-2" aria-labelledby="ghost">
+              <h2 id="ghost" className="font-semibold text-brand-navy">
+                Ghost runner
+              </h2>
+              <p className="text-sm">
+                Against your run on {ghostMatch.startedAt.slice(0, 10)} on the same route:{" "}
+                <strong>
+                  {ghost.final === null || ghost.final === 0
+                    ? "level"
+                    : `${formatDuration(Math.abs(ghost.final))} ${ghost.final < 0 ? "ahead" : "behind"}`}
+                </strong>{" "}
+                after {ghost.rows.at(-1)!.km} km.
+              </p>
+              <ul className="space-y-1 text-sm" aria-label="Ghost comparison by kilometre">
+                {ghost.rows.map((r) => (
+                  <li key={r.km} className="flex items-center gap-2">
+                    <span className="w-12 text-muted-foreground">km {r.km}</span>
+                    <span
+                      aria-hidden
+                      className={`h-2 rounded ${r.delta <= 0 ? "bg-success" : "bg-brand-red"}`}
+                      style={{ width: `${Math.min(60, 4 + Math.abs(r.delta) / 2)}%` }}
+                    />
+                    <span>
+                      {r.delta === 0
+                        ? "level"
+                        : `${formatDuration(Math.abs(r.delta))} ${r.delta < 0 ? "ahead" : "behind"}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Matched by start, finish and shape; GPS distance varies a little between runs.
+              </p>
             </section>
           )}
           {own && others.length > 0 && (

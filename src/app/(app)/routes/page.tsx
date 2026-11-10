@@ -43,10 +43,20 @@ const selectClass = "h-9 rounded-md border bg-background px-2 text-sm";
 export default async function RoutesPage({ searchParams }: PageProps<"/routes">) {
   const ctx = await getRunnerContext();
   const header = (
-    <PageHeader
-      title="Hyderabad Run Explorer"
-      description="Real routes from GPX tracks and OpenStreetMap, with community reviews and condition reports."
-    />
+    <>
+      <PageHeader
+        title="Hyderabad Run Explorer"
+        description="Real routes from GPX tracks and OpenStreetMap, with community reviews and condition reports."
+      />
+      <p className="-mt-2 mb-4 flex flex-wrap gap-3 text-sm">
+        <Link href="/routes/roulette" className="underline underline-offset-4">
+          Run Roulette
+        </Link>
+        <Link href="/routes/collection" className="underline underline-offset-4">
+          Your route collection
+        </Link>
+      </p>
+    </>
   );
   if (!ctx)
     return (

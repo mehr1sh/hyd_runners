@@ -127,6 +127,7 @@ export type RadarRun = {
   going: number;
   paceGroups: string[];
   clubId: string | null;
+  beginner: boolean;
 };
 
 /** Upcoming published group runs with a meeting place, for Run Radar. No runner locations are involved. */
@@ -136,7 +137,7 @@ export async function radarRuns(supabase: SupabaseClient, days = 14): Promise<Ra
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, starts_at, capacity, club_id, locations!inner(name, latitude, longitude), event_pace_groups(label, sort_order)",
+      "id, title, starts_at, capacity, club_id, locations!inner(name, latitude, longitude), event_pace_groups(label, sort_order), group_run_series(beginner_friendly)",
     )
     .eq("status", "published")
     .gte("starts_at", nowIso)
@@ -165,6 +166,7 @@ export async function radarRuns(supabase: SupabaseClient, days = 14): Promise<Ra
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((g) => g.label),
       clubId: (r.club_id as string | null) ?? null,
+      beginner: Boolean((r.group_run_series as { beginner_friendly?: boolean } | null)?.beginner_friendly),
     };
   });
 }

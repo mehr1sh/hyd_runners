@@ -11,6 +11,8 @@ import { setAttendance } from "@/features/squads/actions";
 import { ChatForm, ReportMessage, SquadButton, SquadRunForm } from "@/features/squads/components/forms";
 import { squadAchievements, targetStreak } from "@/features/squads/logic";
 import { squadDetail } from "@/features/squads/queries";
+import { RelayForm } from "@/features/experiments/components/forms";
+import { JOURNEYS, relayStatus, type JourneyKey } from "@/features/experiments/logic";
 
 export const metadata: Metadata = { title: "Squad" };
 
@@ -45,6 +47,24 @@ export default async function SquadPage({ params }: PageProps<"/squads/[id]">) {
   const thisWeek = weeks.at(-1);
   const lastWeek = weeks.at(-2);
   const streak = targetStreak(weeks, squad.weeklyKmTarget);
+  const relayRows = isMember
+    ? (((
+        await ctx.supabase.from("squad_relays").select("id, journey, starts_on").eq("squad_id", id).order("created_at")
+      ).data ?? []) as {
+        id: string;
+        journey: JourneyKey;
+        starts_on: string;
+      }[])
+    : [];
+  const relays = await Promise.all(
+    relayRows.map(async (r) => {
+      const p = (await ctx.supabase.rpc("squad_relay_progress", { p_relay: r.id })).data as {
+        km: number;
+        contributors: number;
+      } | null;
+      return { ...r, km: Number(p?.km ?? 0), contributors: Number(p?.contributors ?? 0) };
+    }),
+  );
   const achievements = squadAchievements(weeks, squad.weeklyKmTarget, active.length);
   const now = nowIso();
 
@@ -207,6 +227,39 @@ export default async function SquadPage({ params }: PageProps<"/squads/[id]">) {
           </div>
 
           <aside className="space-y-4">
+            <section aria-labelledby="relay-h" className="space-y-2 rounded-xl border bg-card p-4 text-sm">
+              <h2 id="relay-h" className="font-semibold text-brand-navy">
+                Virtual relay
+              </h2>
+              {relays.length === 0 ? (
+                <p className="text-muted-foreground">
+                  Add up the squad&apos;s real kilometres along a simulated journey.
+                </p>
+              ) : (
+                relays.map((r) => {
+                  const st = relayStatus(r.journey, r.km);
+                  return (
+                    <div key={r.id} className="space-y-1">
+                      <p className="font-medium">{JOURNEYS[r.journey].name}</p>
+                      <div className="h-2 rounded bg-muted" aria-hidden>
+                        <div className="h-2 rounded bg-success" style={{ width: `${st.pct}%` }} />
+                      </div>
+                      <p>
+                        {r.km} of {JOURNEYS[r.journey].km.toLocaleString("en-IN")} km ({st.pct}%) from {r.contributors}{" "}
+                        runner
+                        {r.contributors === 1 ? "" : "s"}
+                        {st.next ? ` · ${st.next.kmToGo} km to ${st.next.name}` : " · journey complete"}
+                      </p>
+                      {st.passed.length > 0 && <p className="text-muted-foreground">Passed: {st.passed.join(", ")}</p>}
+                    </div>
+                  );
+                })
+              )}
+              <p className="text-xs text-muted-foreground">
+                Simulated: your real distances on approximate road distances. Nobody travels anywhere.
+              </p>
+              {isCaptain && <RelayForm squadId={id} today={ctx.today} />}
+            </section>
             <section aria-labelledby="ach-h" className="space-y-2 rounded-xl border bg-card p-4">
               <h2 id="ach-h" className="font-semibold text-brand-navy">
                 Shared achievements

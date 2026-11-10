@@ -56,7 +56,7 @@ export const RUNNER_NAV: NavItem[] = [
     label: "Community",
     icon: Users,
     mobilePrimary: true,
-    match: ["/clubs", "/challenges", "/feed", "/runners", "/squads", "/matching"],
+    match: ["/clubs", "/challenges", "/feed", "/runners", "/squads", "/matching", "/captains"],
   },
   { href: "/events", label: "Events", icon: CalendarCheck },
   { href: "/profile", label: "Profile", icon: CircleUserRound },

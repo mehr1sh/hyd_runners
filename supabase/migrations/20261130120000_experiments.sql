@@ -194,3 +194,29 @@ end;
 $$;
 revoke all on function public.set_challenge_cause(uuid, text, text), public.verify_challenge_cause(uuid, boolean) from public, anon;
 grant execute on function public.set_challenge_cause(uuid, text, text), public.verify_challenge_cause(uuid, boolean) to authenticated;
+
+-- Run Captains Network: people who captain or sweep group runs, with the runs
+-- they have led. "Verified" only when an admin verified their run-captain profile.
+create function public.captains_network()
+returns table (user_id uuid, display_name text, runs_led bigint, upcoming bigint, verified boolean)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.user_id, p.display_name,
+         count(*) filter (where e.ends_at < now()),
+         count(*) filter (where e.starts_at >= now()),
+         exists (select 1 from public.professional_profiles pp
+                  where pp.user_id = t.user_id and pp.profession = 'run_captain' and pp.verification_status = 'verified')
+  from public.event_team t
+  join public.events e on e.id = t.event_id and e.status = 'published'
+  join public.profiles p on p.id = t.user_id
+  where t.role in ('captain', 'sweeper')
+    and not private.is_blocked_between(t.user_id, (select auth.uid()))
+  group by t.user_id, p.display_name
+  order by count(*) filter (where e.ends_at < now()) desc, p.display_name
+  limit 200;
+$$;
+revoke all on function public.captains_network() from public, anon;
+grant execute on function public.captains_network() to authenticated;
