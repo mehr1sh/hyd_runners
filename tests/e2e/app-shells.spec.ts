@@ -26,6 +26,8 @@ const ROUTES = [
   "/squads",
   "/professionals",
   "/bookings",
+  "/passport",
+  "/leagues",
   "/profile",
   "/coach",
   "/manager",
