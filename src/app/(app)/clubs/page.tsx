@@ -18,7 +18,17 @@ export const metadata: Metadata = { title: "Clubs" };
 export default async function ClubsPage({ searchParams }: PageProps<"/clubs">) {
   const ctx = await getRunnerContext();
   const header = (
-    <PageHeader title="Clubs" description="Find a running club near you and run with people who show up." />
+    <>
+      <PageHeader title="Clubs" description="Find a running club near you and run with people who show up." />
+      <p className="-mt-2 mb-4 flex flex-wrap gap-3 text-sm">
+        <Link href="/clubs/pass" className="underline underline-offset-4">
+          Your club pass
+        </Link>
+        <Link href="/captains" className="underline underline-offset-4">
+          Run captains
+        </Link>
+      </p>
+    </>
   );
   if (!ctx)
     return (

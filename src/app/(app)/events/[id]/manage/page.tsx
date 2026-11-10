@@ -15,6 +15,7 @@ import { PaceGroupManager, Roster, TeamList, UpdateComposer } from "@/features/e
 import { ResultsImportForm, SponsorForm } from "@/features/passport/components/forms";
 import { getEventDetail, getRoster } from "@/features/events/queries";
 import { routeOptions } from "@/features/routes/queries";
+import { MysteryForm } from "@/features/experiments/components/forms";
 
 export const metadata: Metadata = { title: "Manage event" };
 
@@ -86,6 +87,14 @@ export default async function ManageEventPage({ params }: PageProps<"/events/[id
         {detail.canManage && (
           <TabsContent value="details" className="pt-4">
             <EventForm event={event} locations={locations} routes={routes} />
+            <section className="mt-6 space-y-2">
+              <h2 className="font-semibold text-brand-navy">Mystery run</h2>
+              <p className="text-sm text-muted-foreground">
+                Hide a published route until a reveal time. Runners see the distance; meeting point and safety details
+                stay visible.
+              </p>
+              <MysteryForm eventId={event.id} routes={routes.map((r) => ({ id: r.id, name: r.name }))} current={null} />
+            </section>
           </TabsContent>
         )}
         {detail.canManage && (

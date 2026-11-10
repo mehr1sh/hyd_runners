@@ -68,6 +68,7 @@ export const RUNNER_NAV: NavItem[] = [
       "/leagues",
       "/professionals",
       "/bookings",
+      "/captains",
     ],
   },
   { href: "/events", label: "Events", icon: CalendarCheck },

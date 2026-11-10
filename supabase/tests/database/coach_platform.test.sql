@@ -132,7 +132,7 @@ select lives_ok($$ select public.review_professional('9d000000-0000-4000-8000-00
   'an admin verifies');
 select pg_temp.act_as('9d000000-0000-4000-8000-0000000000d1');
 select lives_ok($$ update public.professional_profiles set credentials = '[{"name":"Other"}]' $$, 'editing credentials');
-select is((select verification_status from public.professional_profiles), 'unverified', 'sends the profile back to unverified');
+select is((select verification_status from public.professional_profiles where user_id = '9d000000-0000-4000-8000-0000000000d1'), 'unverified', 'sends the profile back to unverified');
 
 select * from finish();
 rollback;

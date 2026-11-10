@@ -40,6 +40,15 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
   const detail = await getEventDetail(ctx.supabase, id, ctx.user.id, ctx.user.roles);
   if (!detail) notFound();
   const { event, location, counts, mine, paceGroups } = detail;
+  const mystery = (
+    ((await ctx.supabase.rpc("mystery_route", { p_event: id })).data ?? []) as {
+      revealed: boolean;
+      reveal_at: string | null;
+      slug: string | null;
+      name: string | null;
+      distance_m: number;
+    }[]
+  )[0];
   const recap = await groupRunRecap(ctx.supabase, id);
   const now = detail.now;
   const past = new Date(event.endsAt).getTime() <= now;
@@ -111,6 +120,34 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
               )}
             </div>
           </section>
+
+          {mystery && (
+            <section
+              className="space-y-1 rounded-xl border-2 border-dashed bg-card p-4 text-sm"
+              aria-labelledby="mystery"
+            >
+              <h2 id="mystery" className="font-semibold text-brand-navy">
+                Mystery run
+              </h2>
+              {mystery.revealed && mystery.slug ? (
+                <p>
+                  The route:{" "}
+                  <Link href={`/routes/${mystery.slug}`} className="underline underline-offset-4">
+                    {mystery.name}
+                  </Link>{" "}
+                  ({(Number(mystery.distance_m) / 1000).toFixed(1)} km)
+                </p>
+              ) : (
+                <p>
+                  The route is revealed {mystery.reveal_at ? formatDateTime(mystery.reveal_at, ctx.timezone) : "later"}.
+                  It&apos;s about {(Number(mystery.distance_m) / 1000).toFixed(1)} km, a published HYD Runners route.
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                The meeting point, organisers and safety details above stay the same.
+              </p>
+            </section>
+          )}
 
           {detail.route && (
             <section className="space-y-2" aria-labelledby="event-route">
