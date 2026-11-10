@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 import { PR_DISTANCES, type PrKey } from "@/features/activities/logic/normalize";
 import { ACTIVITY_TYPE_LABEL, duration, km, pace } from "@/features/activities/logic/format";
 import { formatDuration } from "@/features/events/logic";
-import { CARD_FORMATS, cardDate, routeSvgPath, type CardOptions } from "./logic";
+import { CARD_FORMATS, cardDate, elevationSvgPath, routeSvgPath, type CardOptions } from "./logic";
 
 const NAVY = "#2c335a";
 const RED = "#e31e25";
@@ -20,6 +20,8 @@ export type ActivityCardData = {
   elevationGain: number | null;
   publicPath: [number, number][] | null;
   bestEfforts: Partial<Record<PrKey, number>>;
+  /** [distance m, elevation m] pairs, used by the elevation poster. */
+  elevationProfile?: [number, number][] | null;
 };
 
 export type ChallengeCardData = {
@@ -30,8 +32,17 @@ export type ChallengeCardData = {
   rewardXp: number;
 };
 
+const PALETTE = {
+  classic: { bg: OFF_WHITE, fg: NAVY, route: RED, accent: RED },
+  neon: { bg: "#0b0f1a", fg: "#f4f6fb", route: "#39ff88", accent: "#39ff88" },
+  minimal: { bg: "#ffffff", fg: "#111111", route: "#111111", accent: RED },
+  elevation: { bg: "#10213a", fg: "#f4f6fb", route: "#ffb547", accent: "#ffb547" },
+} as const;
+const palette = (o: CardOptions) => PALETTE[o.theme ?? "classic"];
+
 function Frame({ o, children }: { o: CardOptions; children: ReactElement | ReactElement[] }) {
   const { width, height } = CARD_FORMATS[o.format];
+  const c = palette(o);
   const pad = o.format === "wide" ? 48 : 72;
   return (
     <div
@@ -40,14 +51,14 @@ function Frame({ o, children }: { o: CardOptions; children: ReactElement | React
         height,
         display: "flex",
         flexDirection: "column",
-        backgroundColor: OFF_WHITE,
-        color: NAVY,
+        backgroundColor: c.bg,
+        color: c.fg,
         padding: pad,
         fontFamily: "sans-serif",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: RED, display: "flex" }} />
+        <div style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: c.accent, display: "flex" }} />
         <div style={{ fontSize: o.format === "wide" ? 28 : 36, fontWeight: 700, letterSpacing: 4 }}>HYD RUNNERS</div>
       </div>
       {children}
@@ -70,7 +81,10 @@ export function activityCard(a: ActivityCardData, o: CardOptions) {
   const big = o.format !== "wide";
   const mapW = wide ? 460 : width - 144;
   const mapH = wide ? 460 : o.format === "story" ? 820 : 400;
-  const path = o.showRoute ? routeSvgPath(a.publicPath, mapW, mapH, 24) : null;
+  const c = palette(o);
+  const elevation =
+    o.theme === "elevation" ? elevationSvgPath(a.elevationProfile ?? null, mapW, Math.round(mapH * 0.6)) : null;
+  const path = o.showRoute && !elevation ? routeSvgPath(a.publicPath, mapW, mapH, 24) : null;
   const best = PR_DISTANCES.filter((d) => a.bestEfforts[d.key] !== undefined).at(-1);
   const stats = [
     { label: "Distance", value: km(a.distanceM) },
@@ -87,13 +101,33 @@ export function activityCard(a: ActivityCardData, o: CardOptions) {
       </div>
     </div>
   );
-  const map = path ? (
+  const map = elevation ? (
+    <svg
+      width={mapW}
+      height={Math.round(mapH * 0.6)}
+      viewBox={`0 0 ${mapW} ${Math.round(mapH * 0.6)}`}
+      style={{ display: "flex" }}
+    >
+      <path d={elevation} fill={c.route} fillOpacity={0.85} stroke="none" />
+    </svg>
+  ) : path ? (
     <svg width={mapW} height={mapH} viewBox={`0 0 ${mapW} ${mapH}`} style={{ display: "flex" }}>
+      {o.theme === "neon" && (
+        <path
+          d={path}
+          fill="none"
+          stroke={c.route}
+          strokeOpacity={0.25}
+          strokeWidth={wide ? 24 : 34}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
       <path
         d={path}
         fill="none"
-        stroke={RED}
-        strokeWidth={wide ? 8 : 12}
+        stroke={c.route}
+        strokeWidth={o.theme === "minimal" ? (wide ? 4 : 6) : wide ? 8 : 12}
         strokeLinecap="round"
         strokeLinejoin="round"
       />

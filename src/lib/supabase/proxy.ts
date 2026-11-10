@@ -31,6 +31,7 @@ export const PROTECTED_PREFIXES = [
   "/notifications",
   "/matching",
   "/squads",
+  "/wrapped",
   "/professionals",
   "/bookings",
   "/passport",

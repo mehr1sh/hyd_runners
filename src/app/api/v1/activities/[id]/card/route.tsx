@@ -6,7 +6,7 @@ import { activityCard, renderCard } from "@/features/share/cards";
 import { parseCardOptions, safeFilename } from "@/features/share/logic";
 
 const COLUMNS =
-  "id, user_id, activity_type, name, visibility, privacy_trim_m, status, started_at, distance_m, moving_seconds, avg_pace_s, elevation_gain_m, best_efforts, created_at, activity_public_geojson";
+  "id, user_id, activity_type, name, visibility, privacy_trim_m, status, started_at, distance_m, moving_seconds, avg_pace_s, elevation_gain_m, best_efforts, elevation_profile, created_at, activity_public_geojson";
 
 /**
  * GET /api/v1/activities/:id/card?format=square|story|wide&route=0&pace=0

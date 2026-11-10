@@ -3,18 +3,24 @@ import { cardDate, cardQuery, parseCardOptions, routeSvgPath, safeFilename } fro
 
 describe("share card options", () => {
   it("defaults to a square card with route and pace, and ignores unknown formats", () => {
-    expect(parseCardOptions(new URLSearchParams(""))).toEqual({ format: "square", showRoute: true, showPace: true });
+    expect(parseCardOptions(new URLSearchParams(""))).toEqual({
+      format: "square",
+      showRoute: true,
+      showPace: true,
+      theme: "classic",
+    });
     expect(parseCardOptions(new URLSearchParams("format=poster&route=0&pace=0"))).toEqual({
       format: "square",
       showRoute: false,
       showPace: false,
+      theme: "classic",
     });
     expect(parseCardOptions(new URLSearchParams("format=story")).format).toBe("story");
     expect(parseCardOptions(new URLSearchParams("format=__proto__")).format).toBe("square");
   });
 
   it("round-trips through the query string", () => {
-    const o = { format: "wide" as const, showRoute: false, showPace: true };
+    const o = { format: "wide" as const, showRoute: false, showPace: true, theme: "classic" as const };
     expect(cardQuery(o)).toBe("format=wide&route=0");
     expect(parseCardOptions(new URLSearchParams(cardQuery(o)))).toEqual(o);
   });
