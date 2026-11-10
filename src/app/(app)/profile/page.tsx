@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ProfileStyleForm } from "@/features/storytelling/components/forms";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ const ROLE_LABEL: Record<string, string> = {
 export default async function ProfilePage() {
   const user = await getCurrentUser();
   const record = user ? await loadOnboarding(await createClient(), user.id) : null;
+  const style = user ? await loadStyle(user.id) : null;
 
   return (
     <>
@@ -77,8 +79,46 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
         {record?.ok && <ProfileForm record={record.data} />}
+        {user && style && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile style</CardTitle>
+              <CardDescription>
+                How your runner profile looks to others. Only badges you&apos;ve earned can be showcased.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProfileStyleForm {...style} />
+            </CardContent>
+          </Card>
+        )}
         {record && !record.ok && <p className="text-sm text-destructive">{record.message}</p>}
       </div>
     </>
   );
+}
+
+async function loadStyle(userId: string) {
+  const supabase = await createClient();
+  const [profile, badges, routes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("profile_theme, showcase_badges, favourite_route_ids, show_race_history")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase.from("user_badges").select("badge_code, badges(title)").eq("user_id", userId),
+    supabase.from("routes").select("id, name").eq("status", "published").order("name").limit(60),
+  ]);
+  if (!profile.data) return null;
+  return {
+    theme: profile.data.profile_theme as string,
+    showcase: (profile.data.showcase_badges as string[]) ?? [],
+    favourites: (profile.data.favourite_route_ids as string[]) ?? [],
+    showRaces: Boolean(profile.data.show_race_history),
+    earned: ((badges.data ?? []) as unknown as { badge_code: string; badges: { title: string } | null }[]).map((b) => ({
+      code: b.badge_code,
+      title: b.badges?.title ?? b.badge_code,
+    })),
+    routes: (routes.data ?? []) as { id: string; name: string }[],
+  };
 }

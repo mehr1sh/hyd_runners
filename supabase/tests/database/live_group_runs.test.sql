@@ -5,7 +5,7 @@
 -- requests reach staff; the recap never singles out an individual's run.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(28);
 
 create function pg_temp.act_as(uid uuid) returns void language sql as $$
   select set_config('role', 'authenticated', true),
@@ -73,7 +73,11 @@ update public.live_shares set expires_at = now() - interval '1 second', started_
  where user_id = 'bf000000-0000-4000-8000-0000000000a1';
 select pg_temp.act_as('bf000000-0000-4000-8000-0000000000c1');
 select is((select count(*) from public.live_positions), 0::bigint, 'an expired share is no longer visible to staff');
-select is(public.purge_stale_live_positions(), 1, 'and its position is purged');
+select ok(public.purge_stale_live_positions() >= 1, 'stale positions are purged');
+reset role;
+select is((select count(*) from public.live_positions where user_id = 'bf000000-0000-4000-8000-0000000000a1'), 0::bigint,
+  'including P''s expired one');
+select pg_temp.act_as('bf000000-0000-4000-8000-0000000000c1');
 
 -- Q shares, then stops.
 select pg_temp.act_as('bf000000-0000-4000-8000-0000000000b1');

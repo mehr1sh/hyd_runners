@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { CARD_FORMATS, cardQuery, type CardFormat } from "../logic";
+import { CARD_FORMATS, CARD_THEMES, cardQuery, type CardFormat, type CardTheme } from "../logic";
 
 /**
  * Preview, download and (where the browser supports sharing files) share a
@@ -15,17 +15,21 @@ export function ShareCardPanel({
   filename,
   canHideRoute,
   canHidePace,
+  themes = false,
 }: {
   endpoint: string;
   filename: string;
   canHideRoute: boolean;
   canHidePace: boolean;
+  /** Poster themes are offered for activity cards. */
+  themes?: boolean;
 }) {
   const [format, setFormat] = useState<CardFormat>("square");
   const [showRoute, setShowRoute] = useState(true);
   const [showPace, setShowPace] = useState(true);
+  const [theme, setTheme] = useState<CardTheme>("classic");
   const [status, setStatus] = useState<string | null>(null);
-  const src = `${endpoint}?${cardQuery({ format, showRoute, showPace })}`;
+  const src = `${endpoint}?${cardQuery({ format, showRoute, showPace, theme })}`;
   const { width, height } = CARD_FORMATS[format];
 
   async function share() {
@@ -70,6 +74,23 @@ export function ShareCardPanel({
             ))}
           </select>
         </div>
+        {themes && (
+          <div className="grid gap-1">
+            <Label htmlFor="card-theme">Style</Label>
+            <select
+              id="card-theme"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as CardTheme)}
+              className="h-9 max-w-xs rounded-md border bg-background px-2 text-sm"
+            >
+              {(Object.keys(CARD_THEMES) as CardTheme[]).map((t) => (
+                <option key={t} value={t}>
+                  {CARD_THEMES[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {canHideRoute && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={showRoute} onChange={(e) => setShowRoute(e.target.checked)} />

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { ghostComparison } from "@/features/experiments/logic";
+import { RouteRecap } from "@/features/storytelling/components/route-recap";
+import { ReflectionForm } from "@/features/storytelling/components/forms";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -39,6 +41,11 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
   const page = await getActivity(ctx.supabase, id, ctx.user.id);
   if (!page) notFound();
   const { activity: a, own, track } = page;
+  const { data: reflection } = await ctx.supabase
+    .from("activity_reflections")
+    .select("difficult, enjoyed, ran_with, achieved, story, share_story")
+    .eq("activity_id", id)
+    .maybeSingle();
   const title = a.name ?? ACTIVITY_TYPE_LABEL[a.type];
   const line = own ? (track?.path ?? a.publicPath) : a.publicPath;
 
@@ -141,6 +148,19 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
             ))}
           </dl>
           {a.elevationProfile && <ElevationProfile profile={a.elevationProfile} />}
+          {own && a.publicPath && a.publicPath.length > 1 && a.distanceM && a.movingSeconds && (
+            <section className="space-y-2" aria-labelledby="recap">
+              <h2 id="recap" className="font-semibold text-brand-navy">
+                Recap
+              </h2>
+              <RouteRecap
+                coordinates={a.publicPath}
+                distanceM={a.distanceM}
+                movingSeconds={a.movingSeconds}
+                splits={splits.filter((x) => !x.partial).map((x) => ({ index: x.index, seconds: x.seconds }))}
+              />
+            </section>
+          )}
           {splits.length > 0 && (
             <section className="space-y-2" aria-labelledby="splits">
               <h2 id="splits" className="font-semibold text-brand-navy">
@@ -357,7 +377,44 @@ export default async function ActivityPage({ params }: PageProps<"/activities/[i
                 filename={safeFilename(a.name ?? `activity-${(a.startedAt ?? "").slice(0, 10)}`)}
                 canHideRoute={Boolean(a.publicPath)}
                 canHidePace={a.type === "run" || a.type === "walk_run"}
+                themes
               />
+            </section>
+          )}
+          {own && a.distanceM && a.movingSeconds ? (
+            <section className="space-y-2 rounded-xl border bg-card p-4" aria-labelledby="story">
+              <h2 id="story" className="font-semibold text-brand-navy">
+                Your story
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Private unless you choose to show it. Suggestions use only your answers and this activity&apos;s
+                numbers.
+              </p>
+              <ReflectionForm
+                activityId={a.id}
+                stats={{
+                  km: km(a.distanceM),
+                  time: duration(a.movingSeconds),
+                  type: ACTIVITY_TYPE_LABEL[a.type],
+                  date: (a.startedAt ?? "").slice(0, 10),
+                }}
+                initial={{
+                  difficult: reflection?.difficult ?? "",
+                  enjoyed: reflection?.enjoyed ?? "",
+                  ranWith: reflection?.ran_with ?? "",
+                  achieved: reflection?.achieved ?? "",
+                  story: reflection?.story ?? "",
+                  share: reflection?.share_story ?? false,
+                }}
+              />
+            </section>
+          ) : null}
+          {!own && reflection?.story && (
+            <section className="space-y-1 rounded-xl border bg-card p-4 text-sm" aria-labelledby="story">
+              <h2 id="story" className="font-semibold text-brand-navy">
+                The runner&apos;s story
+              </h2>
+              <p className="whitespace-pre-line">{reflection.story}</p>
             </section>
           )}
           {own && <ActivitySettings id={a.id} visibility={a.visibility} trim={a.privacyTrimM} name={a.name} />}

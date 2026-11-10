@@ -25,6 +25,7 @@ const ROUTES = [
   "/matching",
   "/squads",
   "/captains",
+  "/wrapped",
   "/professionals",
   "/bookings",
   "/passport",
