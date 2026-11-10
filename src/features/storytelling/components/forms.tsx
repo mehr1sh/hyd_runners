@@ -95,7 +95,7 @@ export function ReflectionForm({
       </label>
       <div className="flex items-center gap-3">
         <Button type="submit" size="sm" disabled={pending}>
-          Save
+          Save story
         </Button>
         <Note state={state} />
       </div>
@@ -167,7 +167,7 @@ export function ProfileStyleForm({
       </label>
       <div className="flex items-center gap-3">
         <Button type="submit" size="sm" disabled={pending}>
-          Save profile style
+          Save showcase
         </Button>
         <Note state={state} />
       </div>

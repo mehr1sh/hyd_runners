@@ -73,7 +73,7 @@ test("a runner tells the story of a run and sees their year", async ({ page }, t
     "10.00 km run in 50:00 with Asha. Best bit: sunrise over the lake.",
   );
   await page.getByRole("checkbox", { name: /Show my story/ }).check();
-  await page.getByRole("region", { name: "Your story" }).getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save story" }).click();
   await expect(page.getByText(/Saved\. Your story shows/)).toBeVisible();
 
   const neon = await page.request.get(`/api/v1/activities/${act.id}/card?format=square&theme=neon`);
