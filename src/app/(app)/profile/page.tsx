@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,11 @@ export default async function ProfilePage() {
   return (
     <>
       <PageHeader title="Profile and preferences" description="How you appear to others and how your plan is built." />
+      <p className="mb-4 text-sm">
+        <Link href="/profile/integrations" className="underline underline-offset-4">
+          Connected apps and devices
+        </Link>
+      </p>
       <div className="space-y-6">
         <Card>
           <CardHeader>
