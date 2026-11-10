@@ -39,11 +39,14 @@ describe("security headers", () => {
     expect(header(PROD, "X-Frame-Options")).toBe("DENY");
   });
 
-  it("deny powerful features, including geolocation (the app never asks for it)", () => {
+  it("deny powerful features, and allow geolocation to this origin only (opt-in live sharing)", () => {
     const policy = permissionsPolicy();
-    for (const feature of ["camera", "microphone", "payment", "usb", "geolocation"]) {
+    for (const feature of ["camera", "microphone", "payment", "usb"]) {
       expect(policy).toContain(`${feature}=()`);
     }
+    expect(policy).toContain("geolocation=(self)");
+    expect(policy).not.toContain("geolocation=()");
+    expect(policy).not.toMatch(/geolocation=\((\*|.*https?:)/);
     expect(header(PROD, "Permissions-Policy")).toBe(policy);
   });
 

@@ -122,6 +122,30 @@ export async function savePaceGroupAction(_prev: EventFormState, formData: FormD
   return { status: "success", message: "Pace group added." };
 }
 
+export async function setPaceGroupLeaderAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {
+  const current = await session();
+  if (!current.ok) return { status: "error", message: current.message };
+  const eventId = String(formData.get("eventId") ?? "");
+  const paceGroupId = String(formData.get("paceGroupId") ?? "");
+  const leader = String(formData.get("leaderId") ?? "");
+  const uuid = /^[0-9a-f-]{36}$/i;
+  if (!uuid.test(eventId) || !uuid.test(paceGroupId) || (leader && !uuid.test(leader)))
+    return { status: "error", message: "Check the form." };
+  const { error, data } = await current.supabase
+    .from("event_pace_groups")
+    .update({ leader_id: leader || null })
+    .eq("id", paceGroupId)
+    .eq("event_id", eventId)
+    .select("id");
+  if (error || !data?.length)
+    return {
+      status: "error",
+      message: error?.code === "22023" ? "Leaders must be on the event team." : "Could not update the leader.",
+    };
+  refresh(eventId);
+  return { status: "success", message: leader ? "Leader assigned." : "Leader removed." };
+}
+
 export async function deletePaceGroupAction(_prev: EventFormState, formData: FormData): Promise<EventFormState> {
   const current = await session();
   if (!current.ok) return { status: "error", message: current.message };

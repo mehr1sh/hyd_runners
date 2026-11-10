@@ -21,6 +21,8 @@ import {
 } from "@/features/events/logic";
 import { getEventDetail } from "@/features/events/queries";
 
+import { groupRunRecap } from "@/features/live/queries";
+
 export const metadata: Metadata = { title: "Event" };
 
 export default async function EventPage({ params }: PageProps<"/events/[id]">) {
@@ -38,6 +40,7 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
   const detail = await getEventDetail(ctx.supabase, id, ctx.user.id, ctx.user.roles);
   if (!detail) notFound();
   const { event, location, counts, mine, paceGroups } = detail;
+  const recap = await groupRunRecap(ctx.supabase, id);
   const now = detail.now;
   const past = new Date(event.endsAt).getTime() <= now;
   const cancelled = event.status === "cancelled";
@@ -154,6 +157,33 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
             </section>
           )}
 
+          {past && recap && (
+            <section className="space-y-2 rounded-xl border bg-card p-4" aria-labelledby="recap">
+              <h2 id="recap" className="font-semibold text-brand-navy">
+                Group recap
+              </h2>
+              <p className="text-sm">
+                {recap.checkedIn} checked in of {recap.going} going
+                {recap.finished > 0 ? ` · ${recap.finished} finished` : ""}
+                {recap.distanceM !== null && recap.activities !== null
+                  ? ` · ${(recap.distanceM / 1000).toFixed(1)} km together across ${recap.activities} recorded runs`
+                  : ""}
+              </p>
+              {recap.paceGroups.some((g) => g.checkedIn > 0) && (
+                <p className="text-sm text-muted-foreground">
+                  {recap.paceGroups
+                    .filter((g) => g.checkedIn > 0)
+                    .map((g) => `${g.label}: ${g.checkedIn}`)
+                    .join(" · ")}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                From check-ins and the activities attendees imported or recorded. Group distance appears once at least
+                three runs are recorded, so no one&apos;s run can be singled out.
+              </p>
+            </section>
+          )}
+
           <section className="space-y-2" aria-labelledby="updates">
             <h2 id="updates" className="flex items-center gap-2 font-semibold text-brand-navy">
               <Megaphone className="size-4" aria-hidden /> Updates from the organisers
@@ -188,6 +218,13 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
                 waitlistPosition={detail.waitlistPosition}
               />
             )}
+            {!cancelled &&
+              (mine?.status === "going" || detail.canStaff) &&
+              Math.abs(new Date(event.startsAt).getTime() - now) < 6 * 3_600_000 && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/events/${event.id}/live`}>Live run: share location (opt-in)</Link>
+                </Button>
+              )}
             {active && paceGroups.length > 0 && !past && (
               <PaceGroupPicker eventId={event.id} groups={paceGroups} current={mine?.paceGroupId ?? null} />
             )}
