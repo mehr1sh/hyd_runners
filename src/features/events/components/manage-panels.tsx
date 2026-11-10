@@ -13,6 +13,7 @@ import {
   recordResultAction,
   removeTeamMemberAction,
   savePaceGroupAction,
+  setVolunteerTaskAction,
   setPaceGroupLeaderAction,
   type EventFormState,
 } from "../actions";
@@ -157,12 +158,35 @@ function MakeTeamMember({ eventId, userId, name }: { eventId: string; userId: st
         <select name="role" defaultValue="captain" className={selectClass}>
           <option value="captain">Run captain</option>
           <option value="sweeper">Sweeper</option>
+          <option value="volunteer">Volunteer</option>
         </select>
       </label>
       <Button type="submit" size="sm" variant="ghost" disabled={pending}>
         Add
       </Button>
       <Note state={state} />
+    </form>
+  );
+}
+
+function VolunteerTask({ eventId, userId, task }: { eventId: string; userId: string; task: string }) {
+  const [state, action, pending] = useActionState(setVolunteerTaskAction, idle);
+  return (
+    <form action={action} className="mt-1 flex flex-wrap items-center gap-1">
+      <input type="hidden" name="eventId" value={eventId} />
+      <input type="hidden" name="userId" value={userId} />
+      <Input
+        name="task"
+        defaultValue={task}
+        maxLength={120}
+        placeholder="e.g. Water station, km 5"
+        aria-label="Volunteer task"
+        className="h-8 w-56"
+      />
+      <Button type="submit" size="sm" variant="outline" disabled={pending}>
+        Save task
+      </Button>
+      {state.message && <span className="text-xs text-muted-foreground">{state.message}</span>}
     </form>
   );
 }
@@ -174,7 +198,7 @@ export function TeamList({
   staff,
 }: {
   eventId: string;
-  team: { userId: string; displayName: string; role: TeamRole }[];
+  team: { userId: string; displayName: string; role: TeamRole; task?: string | null }[];
   canManage: boolean;
   staff: { id: string; displayName: string }[] | null;
 }) {
@@ -189,6 +213,12 @@ export function TeamList({
             <li key={m.userId} className="flex items-center justify-between gap-2 p-3">
               <span>
                 {m.displayName} <span className="text-muted-foreground">· {TEAM_ROLE_LABEL[m.role]}</span>
+                {m.role === "volunteer" && !canManage && m.task && (
+                  <span className="block text-xs">Task: {m.task}</span>
+                )}
+                {m.role === "volunteer" && canManage && (
+                  <VolunteerTask eventId={eventId} userId={m.userId} task={m.task ?? ""} />
+                )}
               </span>
               {canManage && <RemoveTeamMember eventId={eventId} userId={m.userId} name={m.displayName} />}
             </li>
@@ -220,6 +250,8 @@ export function TeamList({
               <option value="organiser">Organiser</option>
               <option value="captain">Run captain</option>
               <option value="sweeper">Sweeper</option>
+              <option value="volunteer">Volunteer</option>
+              <option value="volunteer">Volunteer</option>
             </select>
           </label>
           <Button type="submit" disabled={pending}>
